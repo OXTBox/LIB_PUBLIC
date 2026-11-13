@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibecode3D and LIB_*</title>
+<meta name="description" content="Describe a game in plain words and get a vector game: two engines an AI can drive, and the small LIB_* parts it builds with.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050608;
+    --panel: #0b0e12;
+    --line: #1c242c;
+    --text: #c9d4dc;
+    --dim: #7d8a95;
+    --green: #3dff7c;
+    --cyan: #5ef2ff;
+    --red: #ff5a5a;
+    --amber: #ffc94a;
+    --mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 0 16px 80px; }
+  a { color: var(--cyan); text-underline-offset: 3px; }
+  h1, h2, h3 { font-family: var(--mono); font-weight: 700; line-height: 1.2; color: #fff; }
+  h2 { font-size: 1.5rem; margin: 96px 0 8px; }
+  h2::before { content: "> "; color: var(--green); }
+  h3 { font-size: 1.1rem; margin: 0 0 6px; color: var(--green); }
+  p { margin: 0 0 14px; }
+  .lede { color: var(--dim); max-width: 64ch; }
+  code, pre { font-family: var(--mono); font-size: 0.86em; }
+  code { color: var(--cyan); }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    line-height: 1.55;
+    color: var(--text);
+  }
+  pre .c { color: var(--dim); }
+  pre .k { color: var(--green); }
+
+  /* hero */
+  header.hero { padding: 72px 0 32px; }
+  .tag { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.12em; color: var(--green); text-transform: uppercase; }
+  .hero h1 { font-size: clamp(2.2rem, 7vw, 4rem); margin: 12px 0 18px; letter-spacing: -0.02em; }
+  .hero h1 span { color: var(--green); }
+  .hero p { font-size: 1.15rem; max-width: 60ch; }
+  nav.jump { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-family: var(--mono); font-size: 0.85rem; }
+  nav.jump a { color: var(--dim); text-decoration: none; }
+  nav.jump a:hover { color: var(--green); }
+
+  figure { margin: 0; }
+  figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #000; }
+  figcaption { font-size: 0.85rem; color: var(--dim); margin-top: 8px; }
+  .shot-hero { margin-top: 40px; }
+
+  /* plain-words explainer */
+  .three { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 24px; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; }
+  .box p:last-child { margin: 0; }
+
+  /* steps */
+  ol.steps { list-style: none; padding: 0; margin: 24px 0 0; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding-left: 52px; margin-bottom: 26px; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0;
+    width: 34px; height: 34px; border: 1px solid var(--green); border-radius: 50%;
+    display: grid; place-items: center; font-family: var(--mono); color: var(--green);
+  }
+  ol.steps strong { color: #fff; }
+
+  /* library cards */
+  .lib { border-top: 1px solid var(--line); padding: 32px 0; display: grid; grid-template-columns: 1fr; gap: 8px 32px; }
+  .lib .name { font-family: var(--mono); font-size: 1.3rem; color: #fff; }
+  .lib .what { color: var(--green); font-family: var(--mono); font-size: 0.9rem; }
+  .lib .why { color: var(--text); }
+  .lib .meta { font-family: var(--mono); font-size: 0.8rem; color: var(--dim); }
+  .lib .meta b { color: var(--green); font-weight: 400; }
+  .lib pre { margin: 6px 0 0; }
+  .lib > *, .pipe > *, .three > *, .shots > *, .engines > *, ol.steps li { min-width: 0; }
+  .lib .warn { grid-column: 1 / -1; }
+  @media (min-width: 820px) {
+    .lib { grid-template-columns: 240px 1fr; }
+    .lib > .head { grid-row: span 3; }
+    .lib .warn { grid-column: 2; }
+  }
+  code { overflow-wrap: anywhere; }
+
+  /* grid -> 3D pipeline */
+  .pipe { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 24px; align-items: start; }
+  @media (min-width: 820px) { .pipe { grid-template-columns: 1fr 1fr; } }
+  .bits { font-family: var(--mono); font-size: 8px; line-height: 8px; letter-spacing: 0; background: #000; border: 1px solid var(--line); border-radius: 6px; padding: 14px; overflow-x: auto; white-space: pre; color: #17303a; }
+  .bits b { color: var(--cyan); font-weight: 400; }
+  .arrow { font-family: var(--mono); color: var(--green); text-align: center; font-size: 0.85rem; margin: 4px 0; }
+
+  .shots { display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 24px; }
+  @media (min-width: 720px) { .shots.two { grid-template-columns: 1fr 1fr; } }
+
+  .engines { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
+  @media (min-width: 720px) { .engines { grid-template-columns: 1fr 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; margin-top: 18px; }
+  th, td { text-align: left; padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-weight: 400; color: var(--dim); font-size: 0.8rem; }
+  td:first-child { font-family: var(--mono); color: #fff; white-space: nowrap; }
+  .ok { color: var(--green); } .wip { color: var(--amber); } .plan { color: var(--dim); }
+  .tablewrap { overflow-x: auto; }
+
+  .warn { border-left: 3px solid var(--amber); padding: 4px 0 4px 16px; color: var(--text); margin: 18px 0; }
+
+  footer { margin-top: 110px; padding-top: 32px; border-top: 1px solid var(--line); text-align: center; font-family: var(--mono); }
+  footer .ghost { color: var(--green); font-size: 1.05rem; }
+  footer .small { color: var(--dim); font-size: 0.8rem; margin-top: 10px; font-family: var(--sans); }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <div class="tag">vibecode · vector 3D · xTalk</div>
+  <h1>Vibecode3D<span>_</span></h1>
+  <p>Describe a game in plain words, and get a <strong>vector game</strong> back: glowing wireframes, arcade HUDs, mazes, enemies that find their way to you.</p>
+  <p class="lede">Two engines are the interface. You run one, connect an AI, and say what you want. The AI builds with the <code>LIB_*</code> parts, checks its work inside the engine, and shows you a screenshot. You say yes or no.</p>
+  <nav class="jump">
+    <a href="#what">what is this</a>
+    <a href="#plug">how it works</a>
+    <a href="#libs">the libraries</a>
+    <a href="#pipeline">grid → 3D</a>
+    <a href="#engines">engines &amp; games</a>
+    <a href="#status">status</a>
+  </nav>
+  <figure class="shot-hero">
+    <img src="screens/ant4.png" alt="Antack: green and cyan wireframe ant hills on a vector landscape, red enemy ant armies overhead, scores YOUR HILLS 6 and ENEMY HILLS 6" width="1238" height="838">
+    <figcaption>Antack, a 2002 uDevGame entry rebuilt as a vector game. The whole game is one script file.</figcaption>
+  </figure>
+</header>
+
+<section id="what">
+  <h2>What is this, in plain words</h2>
+  <p class="lede">If you have never heard of any of this, start here.</p>
+  <div class="three">
+    <div class="box">
+      <h3>The engines</h3>
+      <p><strong>Vibecode3D</strong> and <strong>xt3d</strong> are game engines you run as ordinary programs. Each has a 3D view, a list of games, and a switch that lets an AI drive it. This is where you start.</p>
+    </div>
+    <div class="box">
+      <h3>Vibecoding</h3>
+      <p>You say what you want. An AI (Claude, or a model running on your own PC) writes the game, checks it inside the engine, loads it and takes a screenshot. You play it and say what to change. Then it goes again.</p>
+    </div>
+    <div class="box">
+      <h3>The LIB_* parts</h3>
+      <p>The small toolboxes the AI reaches for: sprites, mazes, paths, outlines. They all use plain text. A sprite is lines of <code>0</code> and <code>1</code>, and a path is lines of <code>col,row</code>. You can read it and paste it, and an AI can write it. That's the point.</p>
+    </div>
+  </div>
+</section>
+
+<section id="plug">
+  <h2>How it works</h2>
+  <p class="lede">Five steps. The first two you do once.</p>
+  <ol class="steps">
+    <li><strong>Open an engine.</strong> Run <code>VibeCode3D.exe</code> (pure vector lines) or the <code>xt3d</code> bench (GPU 3D). Turn on its <em>Dev server</em>. <span class="plan">Windows for now.</span></li>
+    <li><strong>Connect your AI.</strong> Claude Code, Claude Desktop, or a local model in LM Studio connects through <code>LIB_MCP</code>. Now the AI can run code in the engine, check scripts and see the screen.</li>
+    <li><strong>Describe the game.</strong> In plain words, for example:
+<pre><span class="c">"A boat bobbing on a grid sea. Rocks drift in.
+ Click to fire a laser, 100 points a rock.
+ A rock that hits the boat ends the game."</span></pre>
+    </li>
+    <li><strong>The AI writes one script, and the engine checks it.</strong> A game is one script file with a few hooks: start, update, click, stop. The script is compile-checked inside the engine before you ever see it, then loaded and screenshotted. A first game looks like this (shortened):
+<pre><span class="k">on</span> Game.OnStart
+   Scene.ClearAll
+   Mesh.Define "Cube.Box", MeshBox(160, 160, 160)
+   Mesh.Define "Cube.Floor", MeshGrid(10, 10, 60)
+   <span class="k">put</span> Entity.Spawn("Cube.Floor", 0, 160, 600, "#2E6F8E") <span class="k">into</span> sFloorKey
+   <span class="k">put</span> Entity.Spawn("Cube.Box", 0, 0, 600, "cyan") <span class="k">into</span> sCubeKey
+   HUD.Set "Cube.Title", "SPINNING CUBE", 20, 20, 14
+<span class="k">end</span> Game.OnStart
+
+<span class="k">on</span> Game.OnClick pX, pY
+   <span class="k">put</span> -sDir <span class="k">into</span> sDir      <span class="c">-- click reverses the spin</span>
+   Cube.Spin
+<span class="k">end</span> Game.OnClick</pre>
+    </li>
+    <li><strong>Play it. Say yes, no, more.</strong> That's your part, and it's the part that matters. The machine is fast, but you decide what's fun.</li>
+  </ol>
+  <p>The script reads almost like English. It's <em>xTalk</em>, from the HyperCard family of languages. You never have to write it, but you can always read it, change it and keep it.</p>
+</section>
+
+<section id="libs">
+  <h2>The libraries</h2>
+  <p class="lede">The parts the AI builds with. You don't have to touch them, but if you script things yourself, each one is a single file: <code>start using stack "…/lib_bit.livecodescript"</code>, then call it. Names start with the library's short name (<code>Bit.</code>, <code>Map.</code>, <code>Trace.</code>), and nothing touches your globals or your screen.</p>
+
+  <div class="lib">
+    <div class="head">
+      <div class="name">LIB_BIT</div>
+      <div class="meta"><b>23</b> tests pass</div>
+    </div>
+    <div class="what">1-bit grids: sprites, fonts, tiles</div>
+    <div class="why">Draw a sprite as text, then rotate, flip, shift, invert, pad or count it. It converts to and from PBM images (which the engines show directly) and from BitFontMaker2 font rows. <strong>Benefit:</strong> pixel art that lives in a text field, survives copy and paste, and an AI can draw for you.</div>
+<pre><span class="k">put</span> Bit.Pad(tLetter, 16, 16) <span class="k">into</span> tCell   <span class="c">-- 8x8 character centred in a 16x16 cell</span>
+<span class="k">put</span> Bit.Count(tCell) <span class="k">into</span> tInk          <span class="c">-- how many pixels are filled</span></pre>
+  </div>
+
+  <div class="lib">
+    <div class="head">
+      <div class="name">LIB_MAP</div>
+      <div class="meta"><b>20</b> tests pass</div>
+    </div>
+    <div class="what">Levels, pathfinding and 3D mesh from grids</div>
+    <div class="why">Stitch small grids into a world, check that the doorways line up, find A* paths for enemies, split open space into navigation regions, and get 3D triangles or wireframe edges out. <strong>Benefit:</strong> design a level in a text editor, get a playable 3D maze and enemy AI from the same data.</div>
+<pre><span class="k">put</span> Map.Stitch(tSections, "hall room hall" &amp; return &amp; "room - room") <span class="k">into</span> tWorld
+<span class="k">put</span> Map.FindPath(tWorld, "2,2", "40,20", true) <span class="k">into</span> tPath   <span class="c">-- one col,row per line</span>
+<span class="k">put</span> Map.MeshText(tWorld, 1, 1) <span class="k">into</span> tMesh                  <span class="c">-- triangles for a 3D engine</span></pre>
+  </div>
+
+  <div class="lib">
+    <div class="head">
+      <div class="name">LIB_TRACE</div>
+      <div class="meta"><b>9</b> tests pass</div>
+    </div>
+    <div class="what">Bitmap → vector outlines</div>
+    <div class="why">Follows the edge of every shape in a grid, or in any image's mask, and returns polygon points that a vector graphic takes directly. <strong>Benefit:</strong> turn a logo or sprite into crisp, scalable vector shapes in one line. <span class="plan">(Holes inside shapes aren't traced yet.)</span></div>
+<pre><span class="k">put</span> Trace.MaskToGrid(<span class="k">the</span> maskData <span class="k">of</span> image "logo", tW, tH) <span class="k">into</span> tGrid
+<span class="k">set the</span> points <span class="k">of</span> graphic "outline" <span class="k">to</span> Trace.Contours(tGrid)</pre>
+  </div>
+
+  <div class="lib">
+    <div class="head">
+      <div class="name">LIB_XTJSON</div>
+      <div class="meta">round trip proven on a full engine stack</div>
+    </div>
+    <div class="what">Stacks ↔ JSON</div>
+    <div class="why">The engines and their tools are saved as <em>stacks</em>, binary files that only one program can open. LIB_XTJSON <em>harvests</em> a whole stack (cards, controls, properties, every script) into plain JSON and text files, rebuilds it, and diffs the two to prove nothing was lost. <strong>Benefit:</strong> your stacks become readable by git, by other tools and by AI agents, and they outlive the software that made them.</div>
+<pre><span class="k">start using</span> stack "LCHarvest2.livecodescript"
+harvestStack
+<span class="k">put the</span> result   <span class="c">-- folder with manifest.json, stack_*.json, scripts/</span></pre>
+  </div>
+
+  <div class="lib">
+    <div class="head">
+      <div class="name">LIB_MCP</div>
+      <div class="meta">for development, not for shipping</div>
+    </div>
+    <div class="what">The AI's hands on the engine</div>
+    <div class="why">A small local server inside the engine, plus a command-line tool and an MCP server. Claude, or a local model in LM Studio, can run code, evaluate expressions, <strong>compile-check scripts</strong>, read errors and take screenshots. <strong>Benefit:</strong> this is what makes vibecoding work. The AI checks every script in the real engine before handing it to you, and every script on this page went through it.</div>
+<pre>tools/lcmcp compile my_game.livecodescript   <span class="c"># real compile check from a terminal</span>
+tools/lcmcp run 'put the version'
+tools/lcmcp errors 3                         <span class="c"># last script errors, translated</span></pre>
+    <p class="warn">LIB_MCP runs any code it is sent. It only answers on 127.0.0.1 and checks a token, but never put it inside an app you give to other people.</p>
+  </div>
+</section>
+
+<section id="pipeline">
+  <h2>One grid, three pictures</h2>
+  <p class="lede">This is how the libraries fit together. A face is drawn as 0s and 1s (LIB_BIT). LIB_MAP raises the 1s into blocks and lists their edges. An engine draws the edges.</p>
+  <div class="pipe">
+    <div>
+      <div class="bits" id="bits" aria-label="A 48 by 26 grid of 0s and 1s forming a simple face: two eyebrows, a nose, and a mouth"></div>
+      <div class="arrow">Map.Blocks · Map.BlockEdges ↓</div>
+      <figure>
+        <img src="screens/face_bits.png" alt="The same face as solid cyan 3D blocks on a tilted grid panel, with the text HI! below" loading="lazy" width="1200" height="700">
+        <figcaption>The grid as raised blocks, solid.</figcaption>
+      </figure>
+    </div>
+    <div>
+      <figure>
+        <img src="screens/face_bits_wire.png" alt="The same face as cyan wireframe blocks" loading="lazy" width="1200" height="700">
+        <figcaption>The same blocks as wireframe: each edge drawn once.</figcaption>
+      </figure>
+      <div class="arrow">same data, different engine ↓</div>
+      <figure>
+        <img src="screens/v3.png" alt="The face drawn as cyan vector lines in Vibecode3D, with a status bar showing FPS 30, Edges 623" loading="lazy" width="768" height="696">
+        <figcaption>Vibecode3D draws it as plain vector lines: 623 edges at 30 fps.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="engines">
+  <h2>Engines &amp; games</h2>
+  <p class="lede">The libraries are engine-neutral. Two engines use them today, and the same game script runs on both.</p>
+  <div class="engines">
+    <div class="box">
+      <h3>Vibecode3D</h3>
+      <p>A 3D engine and editor written <em>entirely</em> in xTalk script, about 8,000 lines. It draws vector wireframes in the spirit of 1980s vector arcade machines and the Vectrex. It needs no plugins and no C code. Each game is one card script with hooks like <code>Game.OnStart</code> and <code>Game.OnUpdate</code>.</p>
+    </div>
+    <div class="box">
+      <h3>xt3d</h3>
+      <p>The same kind of scripts, driving <strong>raylib 6.2</strong> for real GPU 3D. 493 raylib functions are generated straight from <code>raylib.h</code>, with raylib's own names (<code>xt3d_DrawCube</code>), so anything you or your AI know about raylib carries over. It renders into a window that also holds ordinary buttons and fields. <span class="plan">Windows for now.</span></p>
+    </div>
+  </div>
+
+  <div class="shots two">
+    <figure>
+      <img src="screens/ant1.png" alt="Antack title screen: green vector letters ANTACK, menu EASY MEDIUM HARD TRAINER QUIT, controls listed below" loading="lazy" width="1238" height="838">
+      <figcaption><strong>Antack</strong>: launch ant armies at six enemy hills and shoot down theirs. Original T3D game: Tobias Opfermann (code), William Griffin (design), Russell Murphy (voices).</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/g_Canyon.png" alt="Canyon: a green wireframe canyon tunnel seen from the cockpit, with a ship ahead" loading="lazy" width="1238" height="838">
+      <figcaption><strong>Canyon</strong>: a 3D canyon run.</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/g_demo.png" alt="The Sea demo: a white wireframe boat on a blue grid sea among orange wireframe rocks, SCORE 000000" loading="lazy" width="1238" height="838">
+      <figcaption><strong>The Sea</strong> demo: a boat on a grid sea; laser the drifting rocks.</figcaption>
+    </figure>
+    <figure>
+      <img src="screens/bench_face2.png" alt="The xt3d test bench: the block face in a 3D view, controls on the right, status reading Claude (LIB_MCP connected)" loading="lazy" width="1238" height="838">
+      <figcaption>The xt3d bench with LIB_MCP connected. This is what an AI agent sees and drives.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="status">
+  <h2>Status, honestly</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>piece</th><th>state</th><th>next</th></tr></thead>
+    <tbody>
+      <tr><td>LIB_BIT</td><td class="ok">working, tested</td><td>whole-font import/export, animation frames, undo</td></tr>
+      <tr><td>LIB_MAP</td><td class="ok">working, tested</td><td>path caching for big worlds, texture coordinates</td></tr>
+      <tr><td>LIB_TRACE</td><td class="ok">working, tested</td><td>trace holes, simplify points, extrude to 3D mesh</td></tr>
+      <tr><td>LIB_XTJSON</td><td class="wip">round trip works</td><td>shared groups, hidden objects, array custom properties</td></tr>
+      <tr><td>LIB_MCP</td><td class="ok">in daily use</td><td>more tool packs</td></tr>
+      <tr><td>Vibecode3D</td><td class="ok">plays games</td><td>more games from the archive</td></tr>
+      <tr><td>xt3d</td><td class="wip">Windows, works</td><td>see frames over MCP</td></tr>
+      <tr><td>xtalk_py</td><td class="plan">planning</td><td>run xTalk scripts and stacks from Python</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="margin-top:18px">Every library README starts with a three-line example and a table of every handler. Start there.</p>
+</section>
+
+<footer>
+  <div class="ghost">That's the human spirit: the ghost in the machine.</div>
+  <div class="small">We are all connected by the math.</div>
+</footer>
+
+</main>
+<script>
+  // The face, exactly as LIB_BIT stores it (rows 8–22 of screens/face_bits.txt).
+  var rows = [
+    "000000000000000000000001100000000000000000000000",
+    "000000000001111111111001100111111111100000000000",
+    "000000000011111111111001100111111111110000000000",
+    "000000000000111111111001100111111111000000000000",
+    "000000000000000111000011110000111000000000000000",
+    "000000000000000000000011110000000000000000000000",
+    "000000000000000000000011110000000000000000000000",
+    "000000000000000000000011110000000000000000000000",
+    "000000000000000000000011110000000000000000000000",
+    "000000000000000000000011110000000000000000000000",
+    "000000000000000000000001100000000000000000000000",
+    "000000000000000000000001100000000000000000000000",
+    "000000000000000000000000000000000000000000000000",
+    "000000000000000011100000000001110000000000000000",
+    "000000000000000000001111111100000000000000000000"
+  ];
+  document.getElementById("bits").innerHTML = rows.map(function (r) {
+    return r.replace(/1+/g, function (m) { return "<b>" + m + "</b>"; });
+  }).join("\n");
+</script>
+</body>
+</html>
