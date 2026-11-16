@@ -10,3 +10,4 @@ Say xTalk / HyperCard in public text.
 | `index.html` | the page |
 | `screens/` | screenshots and face bitmaps the page shows |
 | `about_LIB_PUBLIC.txt` | the owner's brief |
+| `install/` | a simulated Steam-style install of Vibecode3D and its games on V:, and the people who escape it (`install/README.md`) |
