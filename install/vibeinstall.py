@@ -423,6 +423,18 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copy2(src, dst)
                 log.made(dst)
+        # the Library is the program now: Vibecode3D.exe (the Start Menu, the Desktop, every
+        # "Play <Game>.cmd", engine_path.txt) is the same program, so no way in opens the old
+        # Vibecode3D app, whose game list reads the owner's projects (16 Nov: it opened instead)
+        lib_exe = os.path.join(LAUNCHER_DIR, "Vibecode3D Library.exe")
+        if os.path.isfile(lib_exe):
+            dst = os.path.join(m.install_dir, "Vibecode3D.exe")
+            try:
+                shutil.copy2(lib_exe, dst)
+            except PermissionError:
+                say("  Vibecode3D.exe is running (Windows locks it): close every Vibecode3D window, "
+                    "then install again. The rest is installed.")
+            log.made(dst)
     write(log, os.path.join(redist, "game.txt"),
           f"appid\t{COMMON_ID}\nname\tVibecode3D Common\nkind\tredist\nscript\t\n")
     write(log, os.path.join(m.library, f"appmanifest_{COMMON_ID}.txt"),
