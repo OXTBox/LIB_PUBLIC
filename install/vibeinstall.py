@@ -6,7 +6,7 @@ what an installer would do, writes down every file it made (uninstall.log, like 
 models the lookups the launcher and each game make, so escape_sim.py can break the install the
 way real people do and see what still works.
 
-  python3 -I vibeinstall.py install   [--drive /mnt/v] [--user NAME]
+  python3 -I vibeinstall.py install   [--drive /mnt/v] [--user NAME] [--include-held]
   python3 -I vibeinstall.py verify    [--drive /mnt/v] [--user NAME]
   python3 -I vibeinstall.py status    [--drive /mnt/v]
   python3 -I vibeinstall.py uninstall [--drive /mnt/v] [--purge]
@@ -358,11 +358,11 @@ def play_cmd(game_dir_name):
         "start \"\" \"%ENGINE%\" -game \"%GAME%\"\r\n")
 
 
-def install(m, games=None, with_engine=True, quiet=False):
+def install(m, games=None, with_engine=True, quiet=False, include_held=False):
     log = Log(m)
     old_logf = os.path.join(m.install_dir, "uninstall.log")
     old_log = open(old_logf, encoding="utf-8").read().splitlines() if os.path.exists(old_logf) else []
-    cat = [g for g in read_catalog() if (not games or g["key"] in games) and g["key"] not in HOLD]
+    cat = [g for g in read_catalog() if (not games or g["key"] in games) and (include_held or g["key"] not in HOLD)]
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     say = (lambda *a: None) if quiet else print
 
@@ -705,6 +705,8 @@ def find_proposed(game_dir, rel, libraries):
     """Proposed Game.FindFile: the game's own folder first (LIB_GAMES/Vibecode3D_Games/X -> X),
     then Vibecode3D Common in each library."""
     short = rel[len(DEV_PREFIX):] if rel.startswith(DEV_PREFIX) else rel
+    if rel.startswith("LIB_EDITOR/iGame3D_XT/"):          # iGame3D XT carries its Data and Tools
+        short = rel[len("LIB_EDITOR/iGame3D_XT/"):]
     if os.path.exists(os.path.join(game_dir, short)):
         return "found"
     for lib in libraries:
@@ -810,6 +812,8 @@ def main():
     ap.add_argument("--user")
     ap.add_argument("--purge", action="store_true")
     ap.add_argument("--games", help="comma-separated keys (default: all)")
+    ap.add_argument("--include-held", action="store_true",
+                    help="also the titles held back from shipping (HOLD), to try them on this PC")
     a = ap.parse_args()
     if a.cmd == "catalog":
         rows = build_catalog()
@@ -817,7 +821,7 @@ def main():
         return
     m = Machine(a.drive, a.user)
     if a.cmd == "install":
-        install(m, a.games.split(",") if a.games else None)
+        install(m, a.games.split(",") if a.games else None, include_held=a.include_held)
     elif a.cmd == "verify":
         verify(m)
     elif a.cmd == "status":
