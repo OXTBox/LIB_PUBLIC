@@ -37,7 +37,7 @@ COMMON_ID = 1000                            # Steam: 228980 "Steamworks Common R
 DEV_PREFIX = "LIB_GAMES/Vibecode3D_Games/"  # where the games' FindFile looks today
 REPO_PREFIX = "Vibecode3D_Games/"         # the same folder inside the LIB_GAMES repo
 OWNER_ONLY = "//wsl$/Ubuntu/home/igame3d/projects/"   # their last fallback: the owner's PC only
-PUBLIC_REF = "install-findfile"   # LIB_GAMES branch with Game.FindFile; main once it is merged
+PUBLIC_REF = "install-findfile"   # merged into main on 16 Nov: gone, so src_ref() uses main
 
 # ---------------------------------------------------------------- paths
 
@@ -159,19 +159,24 @@ TOOLS = {"Simple_Test1", "Simple_Test2", "Ig3dEditor", "Face", "demo"}
 # (LIB_MOCAP/library holds Animazoo-derived clips: rights unsettled, fine on this drive, a
 #  release blocker for a public build)
 COMMON_LIBS = [("LIB_BIT", "main", "livecode"), ("LIB_MAP", "main", "livecode"),
-               ("LIB_MOCAP", "main", "library"), ("LIB_MOCAP", "anim-list", "livecode"),
+               ("LIB_MOCAP", "main", "library"), ("LIB_MOCAP", "main", "livecode"),
                ("LIB_GENERICA", "main", "sets"), ("LIB_MCP", "main", "assets")]
 DATA_DIRS = {"Antack": ["Antack"], "Thrmnlra": ["Thrmnlra"], "uDead": ["uDead"],
              "VectorToss": ["VectorToss", "Animations"]}
-REFS = ["main", "spark-roadtrip", "vector-toss", "deaddays"]      # main = public, the others = betas
+REFS = ["main"]      # every branch was merged on 16 Nov (owner: merge everything): all games are on main
+# still betas (the Library's Betas list) until the owner promotes them: they came from the
+# spark-roadtrip, vector-toss and deaddays branches
+BETAS = {"BlockCityHustle", "BounceRally", "CoastRoad", "CraterCrawler", "DeadDays", "DodgeTunnel",
+         "FareDash", "FuelLine", "GridSprint", "InterceptorRun", "LightTrailArena", "NeonDriftWastes",
+         "RampRider", "SquadBuggy", "TabletopRacers", "VectorToss", "WreckRing"}
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
-# it ships as the standalone edition (LIB_GAMES ig3d-editor-standalone, STANDALONE_PLAN.md)
+# it ships as the standalone edition (LIB_EDITOR main; the earlier one is tag edition/known-works)
 HOLD = {"Ig3dEditor"}
 # titles whose home moved out of LIB_GAMES (owner, 16 Nov): key -> (repo, ref, folder of the script)
 HOMES = {"GeneticAnomaly": ("LIB_GAD", "main", "GeneticAnomaly/", []),
-         "Ig3dEditor": ("LIB_EDITOR", "ig3d-editor-standalone", "iGame3D_XT/", ["Tools", "Data", "Help_2008"])}
+         "Ig3dEditor": ("LIB_EDITOR", "main", "iGame3D_XT/", ["Tools", "Data", "Help_2008"])}
 # iGame3D XT's model tools, shared in Vibecode3D Common/Tools (DeadDays builds its city with them)
-COMMON_TOOLS = ("LIB_EDITOR", "ig3d-editor-standalone", "iGame3D_XT/Tools")
+COMMON_TOOLS = ("LIB_EDITOR", "main", "iGame3D_XT/Tools")
 
 
 def git(*args, cwd=GAMES_REPO, binary=False):
@@ -220,6 +225,10 @@ def build_catalog():
             m = re.match(r".*/Vibecode3D_Play_(.+)\.livecodescript$", name)
             if m:
                 found.setdefault(m.group(1), []).append((ref, blob_id(ref, name)))
+    # titles that live in another repository (HOMES) are listed whether or not LIB_GAMES still has
+    # a copy (16 Nov: once the old branches were merged, GeneticAnomaly and iGame3D XT vanished)
+    for key in HOMES:
+        found.setdefault(key, [("main", "home:" + HOMES[key][0])])
     rows, next_id = [], max([int(r["appid"]) for r in old.values()] + [COMMON_ID]) + 10
     for key in sorted(found, key=str.lower):
         main_blob = dict(found[key]).get("main")
@@ -230,7 +239,7 @@ def build_catalog():
             appid, next_id = str(next_id), next_id + 10
         rows.append({"appid": appid, "key": key, "name": pretty(key),
                      "kind": "tool" if key in TOOLS else "game",
-                     "branch": "public" if ("main" in refs or key in HOMES) else "beta",
+                     "branch": "beta" if key in BETAS else ("public" if ("main" in refs or key in HOMES) else "beta"),
                      "ref": HOMES[key][1] if key in HOMES else ("main" if "main" in refs else refs[0]),
                      "betas": "" if key in HOMES else ",".join(r for r in refs if r != "main"),
                      "data": ",".join(DATA_DIRS.get(key, []))})
