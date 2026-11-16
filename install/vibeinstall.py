@@ -395,7 +395,7 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
                     shutil.copy2(src, dst)
                 log.made(dst)
         exe = os.path.join(m.install_dir, "VibeCode3D.exe")
-        if os.path.exists(exe):
+        if os.path.exists(exe) and m.win(exe) in log.lines:     # copied above (no Library build)
             os.replace(exe, os.path.join(m.install_dir, "Vibecode3D.exe"))
             log.lines[log.lines.index(m.win(exe))] = m.win(os.path.join(m.install_dir, "Vibecode3D.exe"))
     write(log, os.path.join(m.install_dir, "install.txt"),
