@@ -163,12 +163,15 @@ COMMON_LIBS = [("LIB_BIT", "main", "livecode"), ("LIB_MAP", "main", "livecode"),
                ("LIB_GENERICA", "main", "sets"), ("LIB_MCP", "main", "assets")]
 DATA_DIRS = {"Antack": ["Antack"], "Thrmnlra": ["Thrmnlra"], "uDead": ["uDead"],
              "VectorToss": ["VectorToss", "Animations"]}
-REFS = ["main", "spark-roadtrip", "vector-toss"]      # main = public, the others = betas
+REFS = ["main", "spark-roadtrip", "vector-toss", "deaddays"]      # main = public, the others = betas
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
 # it ships as the standalone edition (LIB_GAMES ig3d-editor-standalone, STANDALONE_PLAN.md)
 HOLD = {"Ig3dEditor"}
 # titles whose home moved out of LIB_GAMES (owner, 16 Nov): key -> (repo, ref, folder of the script)
-HOMES = {"GeneticAnomaly": ("LIB_GAD", "main", "GeneticAnomaly/")}
+HOMES = {"GeneticAnomaly": ("LIB_GAD", "main", "GeneticAnomaly/", []),
+         "Ig3dEditor": ("LIB_EDITOR", "ig3d-editor-standalone", "iGame3D_XT/", ["Tools", "Data", "Help_2008"])}
+# iGame3D XT's model tools, shared in Vibecode3D Common/Tools (DeadDays builds its city with them)
+COMMON_TOOLS = ("LIB_EDITOR", "ig3d-editor-standalone", "iGame3D_XT/Tools")
 
 
 def git(*args, cwd=GAMES_REPO, binary=False):
@@ -227,9 +230,9 @@ def build_catalog():
             appid, next_id = str(next_id), next_id + 10
         rows.append({"appid": appid, "key": key, "name": pretty(key),
                      "kind": "tool" if key in TOOLS else "game",
-                     "branch": "public" if "main" in refs else "beta",
-                     "ref": "main" if "main" in refs else refs[0],
-                     "betas": ",".join(r for r in refs if r != "main"),
+                     "branch": "public" if ("main" in refs or key in HOMES) else "beta",
+                     "ref": HOMES[key][1] if key in HOMES else ("main" if "main" in refs else refs[0]),
+                     "betas": "" if key in HOMES else ",".join(r for r in refs if r != "main"),
                      "data": ",".join(DATA_DIRS.get(key, []))})
     with open(CATALOG, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]), delimiter="\t", lineterminator="\n")
@@ -405,6 +408,11 @@ def install(m, games=None, with_engine=True, quiet=False):
             extract(ref, sub, os.path.join(redist, repo, sub), log, repo=os.path.join(PROJECTS, repo))
         except subprocess.CalledProcessError:
             say(f"  (Common: no {repo}/{sub} on {ref})")
+    try:
+        repo, ref, sub = COMMON_TOOLS
+        extract(ref, sub, os.path.join(redist, "Tools"), log, repo=os.path.join(PROJECTS, repo))
+    except subprocess.CalledProcessError:
+        say("  (Common: no iGame3D XT tools)")
     # the engine the launcher plays games with (LIB_PUBLIC/launcher): Vibecode3D Common\Engine
     install_engine_files(os.path.join(redist, "Engine"), log, say)
     if with_engine and os.path.isdir(LAUNCHER_DIR):        # the exe and its Externals, beside Vibecode3D.exe
@@ -424,7 +432,7 @@ def install(m, games=None, with_engine=True, quiet=False):
         folder = os.path.join(common, g["name"])
         script = f"Vibecode3D_Play_{g['key']}.livecodescript"
         if g["key"] in HOMES:
-            repo, ref_from, sub = HOMES[g["key"]]
+            repo, ref_from, sub, _datas = HOMES[g["key"]]
             blob = git("show", f"{ref_from}:{sub}{script}", binary=True, cwd=os.path.join(PROJECTS, repo))
             ref_from = f"{repo} {ref_from}"
         else:
@@ -434,6 +442,13 @@ def install(m, games=None, with_engine=True, quiet=False):
         with open(os.path.join(folder, script), "wb") as f:
             f.write(blob)
         log.made(os.path.join(folder, script))
+        if g["key"] in HOMES:
+            repo, href, sub, datas = HOMES[g["key"]]
+            for d in datas:
+                try:
+                    extract(href, sub + d, os.path.join(folder, d), log, repo=os.path.join(PROJECTS, repo))
+                except subprocess.CalledProcessError:
+                    say(f"  ({g['name']}: no {d} in {repo} {href})")
         for d in filter(None, g["data"].split(",")):
             ref = ref_from if REPO_PREFIX + d in git("ls-tree", "--name-only", ref_from, REPO_PREFIX).split() \
                 else src_ref(g["betas"].split(",")[0] or "main")
@@ -695,6 +710,9 @@ def find_proposed(game_dir, rel, libraries):
     for lib in libraries:
         c = os.path.join(lib, "common", "Vibecode3D Common")
         if os.path.exists(os.path.join(c, rel)) or os.path.exists(os.path.join(c, short)):
+            return "found"
+        # iGame3D XT's tools: LIB_EDITOR/iGame3D_XT/Tools/... is Vibecode3D Common/Tools/...
+        if rel.startswith("LIB_EDITOR/iGame3D_XT/Tools") and os.path.exists(os.path.join(c, "Tools", rel[len("LIB_EDITOR/iGame3D_XT/Tools"):].lstrip("/"))):
             return "found"
     return "missing"
 

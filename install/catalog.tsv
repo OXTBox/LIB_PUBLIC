@@ -10,6 +10,7 @@ appid	key	name	kind	branch	ref	betas	data
 1090	CoastRoad	Coast Road	game	beta	spark-roadtrip	spark-roadtrip	
 1100	CraterCrawler	Crater Crawler	game	beta	spark-roadtrip	spark-roadtrip	
 1110	CrossTraffic	Cross Traffic	game	public	main		
+1510	DeadDays	Dead Days	game	beta	deaddays	deaddays	
 1120	DeepDive	Deep Dive	game	public	main		
 1130	demo	Demo	tool	public	main		
 1140	DodgeTunnel	Dodge Tunnel	game	beta	spark-roadtrip	spark-roadtrip	
@@ -21,7 +22,7 @@ appid	key	name	kind	branch	ref	betas	data
 1200	GeneticAnomaly	Genetic Anomaly	game	public	main		
 1210	GridSprint	Grid Sprint	game	beta	spark-roadtrip	spark-roadtrip	
 1220	Hunter	Hunter	game	public	main		
-1230	Ig3dEditor	iGame3D Editor	tool	public	main		
+1230	Ig3dEditor	iGame3D XT	tool	public	ig3d-editor-standalone		
 1240	InterceptorRun	Interceptor Run	game	beta	spark-roadtrip	spark-roadtrip	
 1250	JaiAlaiBlock	Jai Alai Block	game	public	main		
 1260	LightTrailArena	Light Trail Arena	game	beta	spark-roadtrip	spark-roadtrip	
