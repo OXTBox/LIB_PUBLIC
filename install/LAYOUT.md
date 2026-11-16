@@ -117,11 +117,12 @@ holds files it didn't install, without asking). The installer now installs the p
 
 - Saves: `Documents\Data\Users\<user>\Saves\<Game>\` (LIB_DATA's Data folder, chosen here) or
   Windows' own `Saved Games\Vibecode3D\` folder?
-- Ship `LIB_MOCAP/library` in Vibecode3D Common? It holds Animazoo-derived clips (rights
-  unsettled): fine on V:, a release blocker for a public build.
+- (decided 16 Nov) `LIB_MOCAP/library`: ship only the clips the working games use, plus ours
+  (Video, proc); Animazoo credited (the product was given away free, the company is gone),
+  FreeBVH credited to Carnegie Mellon. The iGame3D clips: only those a game uses.
 - The 16 spark-roadtrip and Vector Toss games are installed as betas. Should beta games show in
   the launcher by default, or behind an opt-in like Steam's?
-- (16 Nov) The iGame3D Editor's 2008 texts (`LIB_GAMES/igame3D_2008_Texts`) are not in git, so
+- (decided 16 Nov: held back; ships as the standalone edition, LIB_GAMES `ig3d-editor-standalone`) The iGame3D Editor's 2008 texts (`LIB_GAMES/igame3D_2008_Texts`) are not in git, so
   the installer can't ship them: its library stays on your PC only. Track them (rights?), ship
   them some other way, or leave the editor's library empty when installed?
 - (16 Nov) The uninstaller now keeps a whole game folder when it holds a file it didn't install.
