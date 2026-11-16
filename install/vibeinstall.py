@@ -175,7 +175,7 @@ def git(*args, cwd=GAMES_REPO, binary=False):
 
 
 def pretty(key):
-    special = {"uDead": "uDead", "Ig3dEditor": "iGame3D Editor", "VectorPong3D": "Vector Pong 3D"}
+    special = {"uDead": "uDead", "Ig3dEditor": "iGame3D XT", "VectorPong3D": "Vector Pong 3D"}   # iGame3D XT: owner, 16 Nov
     if key in special:
         return special[key]
     s = key.replace("_", " ")
