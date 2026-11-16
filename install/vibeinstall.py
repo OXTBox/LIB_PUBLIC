@@ -378,6 +378,13 @@ def install(m, games=None, with_engine=True, quiet=False):
               "(LIB_DATA). Saves: Users/<you>/Saves/<Game>/. Work/ is safe to empty.\n")
     for g in cat:
         os.makedirs(os.path.join(data, "Users", m.user or "default", "Saves", g["name"]), exist_ok=True)
+        # tells: what the player asks the AI for, from the note box (` or F2) in the game
+        # (GameNotes.livecodescript writes Games/<key>/LIB_LLM/tell_<YYYY-MM-DD_HHMMSS>.txt)
+        os.makedirs(os.path.join(data, "Games", g["key"], "LIB_LLM"), exist_ok=True)
+    if m.drive == "/mnt/" + m.letter.lower():
+        # the simulated PC: the engine runs on the real Windows, whose Documents is not this
+        # drive's, so point the install at this drive's Data folder (GameNotes reads it)
+        write(log, os.path.join(m.install_dir, "data_root.txt"), m.win(data), "")
 
     # 4. shortcuts (real .lnk files when PowerShell is there)
     shortcut(m, log, os.path.join(m.desktop, "Vibecode3D.lnk"), os.path.join(m.install_dir, "Vibecode3D.exe"))

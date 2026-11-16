@@ -20,6 +20,7 @@ ordinary PC's C: drive. The owner decides; nothing here is in the engine yet.
 | Per-user settings | `Steam\userdata\<id>\` and `Steam\config\` (in Program Files) | `%APPDATA%\Vibecode3D\` (`config.txt`, `engine_path.txt`, `data_root.txt`) | Roaming AppData: settings that follow the user |
 | Logs, crash dumps, cache | `Steam\logs\`, `Steam\dumps\` | `%LOCALAPPDATA%\Vibecode3D\logs`, `crashdumps` | Local AppData: this machine only, safe to lose |
 | Saves | each game picks: `Documents\My Games\`, `Saved Games\`, `AppData\LocalLow\<Studio>\`, `userdata\<id>\<appid>\remote\` | `Documents\Data\Users\<user>\Saves\<Game>\` (LIB_DATA's Data folder) | Documents: the user's own, backed up, visible |
+| Tell the AI (the vibe) | none | in any game, ` or F2 opens the note box; each note is `Documents\Data\Games\<Game>\LIB_LLM\tell_<YYYY-MM-DD_HHMMSS>.txt` (game, when, the game's state, the note), for the player's own AI to read | Documents: the player's, survives a wiped AppData and an uninstall |
 | Start a game from outside | `steam://rungameid/<id>`, a desktop `.url` | `vibecode3d://run/<appid>` (written in `_simulated_registry.reg`, not registered), `Play <Game>.cmd`, `-game <folder>` | |
 | Shortcuts | Desktop + Start Menu | Desktop `.lnk` + `ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\` | |
 | Uninstall | registry `Uninstall\Steam`, deletes `steamapps` with it | `uninstall.log` lists every file; settings and saves are left (as real uninstallers do) | |
@@ -45,7 +46,7 @@ V:\Program Files (x86)\Vibecode3D\
         downloading\  temp\  workshop\content\
 V:\AppData\Roaming\Vibecode3D\    config.txt  engine_path.txt
 V:\AppData\Local\Vibecode3D\      logs\install.log  crashdumps\
-V:\Documents\Data\                ROOT.md  Users\default\Saves\<Game>\
+V:\Documents\Data\                ROOT.md  Users\default\Saves\<Game>\  Games\<key>\LIB_LLM\tell_*.txt
 V:\Desktop\Vibecode3D.lnk
 V:\ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\Vibecode3D.lnk
 V:\_SimPCs\<persona>\C\ D\ E\      one simulated PC per persona (escape_sim.py)
