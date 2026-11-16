@@ -43,6 +43,7 @@ end closeStackRequest
 command VL.Start
    local tFolder, tWhy
    put VL.GameArg() into tFolder
+   if the environment is "standalone application" then VL.Log "started:" && $# && "arguments: [" & $1 & "] [" & $2 & "] game folder: [" & tFolder & "]"
    if tFolder is not empty then
       hide me
       put VL.Play(tFolder, true) into tWhy
@@ -53,6 +54,9 @@ command VL.Start
             quit
          end if
       end if
+      -- this copy only plays the game: once its window is open, the library stack goes
+      -- (destroyStack true); if no game window opened, this copy closes and quits
+      if the environment is "standalone application" then send "VL.CloseSelf" to me in 3 seconds
       exit VL.Start
    end if
    VL.BuildUI
@@ -453,18 +457,58 @@ command VL.PlaySelected
    end if
 end VL.PlaySelected
 
+-- the copy is started with Windows' start command (start "" "<exe>" -game "<folder>"), which
+-- returns at once: this library is then free to answer the copy's relaunch message (a new copy
+-- waits for that answer). 'launch ... with' kept the library busy, and the first Play only
+-- opened another library (16 Nov).
 function VL.LaunchCopy pFolder
-   local tExe, tErr
+   local tExe, tErr, tCmd, tOut
    put the effective filename of me into tExe
    if tExe is empty then return "this program's own file is unknown"
+   replace "\" with "/" in pFolder
+   if char -1 of pFolder is "/" then delete char -1 of pFolder
+   if the platform is not "Win32" then
+      try
+         launch VL.WinPath(pFolder) with VL.WinPath(tExe)
+      catch tErr
+         return line 1 of tErr
+      end try
+      return empty
+   end if
+   put "start " & quote & quote & space & quote & VL.WinPath(tExe) & quote & " -game " & quote & VL.WinPath(pFolder) & quote into tCmd
+   VL.Log "play:" && tCmd
+   set the hideConsoleWindows to true
    try
-      launch VL.WinPath(pFolder) with VL.WinPath(tExe)
+      put shell(tCmd) into tOut
    catch tErr
       return line 1 of tErr
    end try
-   if the result is not empty and the result is not a number then return the result
+   if the result is not empty and the result is not 0 then return "start said:" && the result && tOut
    return empty
 end VL.LaunchCopy
+
+-- a game copy, 3 seconds after its start: the library stack closes (destroyStack true). When
+-- no game window is open, the copy did nothing (owner, 16 Nov: the first Play's copy never
+-- opened its game): it says so in the log and quits instead of lingering
+command VL.CloseSelf
+   local tStack, tOpen
+   put false into tOpen
+   repeat for each line tStack in the openStacks
+      if tStack begins with "Play " and the visible of stack tStack then put true into tOpen
+   end repeat
+   if not tOpen then
+      VL.Log "no game window 3 seconds after the start: this copy quits"
+      set the destroyStack of me to true
+      quit
+   end if
+   set the destroyStack of me to true
+   close me
+end VL.CloseSelf
+
+-- a second copy of this program was started: let it run (it is a game, or another library)
+on relaunch
+   pass relaunch
+end relaunch
 
 command VL.ShowFolder
    local tErr
