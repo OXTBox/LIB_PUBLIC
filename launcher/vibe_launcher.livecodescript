@@ -120,7 +120,8 @@ function VL.ReadManifest pPath
    return tA
 end VL.ReadManifest
 
--- every library's vibeapps folder: beside the program first, then libraryfolders.txt
+-- every library's vibeapps folder: beside the program first, then the others in its
+-- libraryfolders.txt (relative to the program, or with a drive letter)
 function VL.Libraries
    local tList, tLine, tPath, tParts, tSeen
    put VL.Root() & "/vibeapps" into tList
@@ -131,6 +132,9 @@ function VL.Libraries
       put tParts into tPath
       replace "\\" with "/" in tPath
       replace "\" with "/" in tPath
+      -- on the program's own drive a library is written relative to it (a USB stick that
+      -- comes up as another letter still works)
+      if not (matchText(tPath, "^[A-Za-z]:") or tPath begins with "/") then put VL.Root() & "/" & tPath into tPath
       put tPath & "/vibeapps" into tPath
       if tSeen[toLower(tPath)] is true then next repeat
       put true into tSeen[toLower(tPath)]

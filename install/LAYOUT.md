@@ -22,8 +22,8 @@ ordinary PC's C: drive. The owner decides; nothing here is in the engine yet.
 | Saves | each game picks: `Documents\My Games\`, `Saved Games\`, `AppData\LocalLow\<Studio>\`, `userdata\<id>\<appid>\remote\` | `Documents\Data\Users\<user>\Saves\<Game>\` (LIB_DATA's Data folder) | Documents: the user's own, backed up, visible |
 | Tell the AI (the vibe) | none | in any game, ` or F2 opens the note box; each note is `Documents\Data\Games\<Game>\LIB_LLM\tell_<YYYY-MM-DD_HHMMSS>.txt` (game, when, the game's state, the note), for the player's own AI to read | Documents: the player's, survives a wiped AppData and an uninstall |
 | Start a game from outside | `steam://rungameid/<id>`, a desktop `.url` | `vibecode3d://run/<appid>` (written in `_simulated_registry.reg`, not registered), `Play <Game>.cmd`, `-game <folder>` | |
-| Shortcuts | Desktop + Start Menu | Desktop `.lnk` + `ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\` | |
-| Uninstall | registry `Uninstall\Steam`, deletes `steamapps` with it | `uninstall.log` lists every file; settings and saves are left (as real uninstallers do) | |
+| Shortcuts | Desktop + Start Menu | Public Desktop `.lnk` (`Users\Public\Desktop`, every account) + `ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\` | |
+| Uninstall | registry `Uninstall\Steam`, deletes `steamapps` with it | `uninstall.log` lists every file; settings and saves are left (as real uninstallers do), and so is any game folder holding a file it didn't install | |
 
 Where we differ from Steam, on purpose: Steam keeps settings and cloud saves inside Program
 Files and makes its own folder writable to get away with it. Vibecode3D follows Windows'
@@ -47,7 +47,7 @@ V:\Program Files (x86)\Vibecode3D\
 V:\AppData\Roaming\Vibecode3D\    config.txt  engine_path.txt
 V:\AppData\Local\Vibecode3D\      logs\install.log  crashdumps\
 V:\Documents\Data\                ROOT.md  Users\default\Saves\<Game>\  Games\<key>\LIB_LLM\tell_*.txt
-V:\Desktop\Vibecode3D.lnk
+V:\Users\Public\Desktop\Vibecode3D.lnk
 V:\ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\Vibecode3D.lnk
 V:\_SimPCs\<persona>\C\ D\ E\      one simulated PC per persona (escape_sim.py)
 ```
@@ -85,6 +85,14 @@ is, so the launcher never has to trust an appmanifest over the folder.
 
 ## 5. The proposed design (what escape_sim.py models as PROPOSED)
 
+Built on 16 Nov (night): 1 (in the eight games, LIB_GAMES branch `install-findfile` and
+`vector-toss`, test t30), 2 in part (library paths relative to the exe on its drive; no drive
+scan yet; launcher test t31), 3 (`vibeinstall.py manifests`), 4 in the model (the engine does
+not read portable.txt yet), 6 in LIB_DATA (branch `data-forwarding`, test t32; the engine and
+games don't use LIB_DATA's Data.Root yet), 10 in part (the uninstaller keeps a game folder that
+holds files it didn't install, without asking). The installer now installs the public games from
+`install-findfile` while that branch exists.
+
 1. **`Game.FindFile`**, one shared handler in the engine: the game's own folder first
    (`LIB_GAMES/Vibecode3D_Games/Antack/x` becomes `<game folder>/Antack/x`), then
    `Vibecode3D Common`, then the walk up, never a fixed path to one PC.
@@ -113,3 +121,11 @@ is, so the launcher never has to trust an appmanifest over the folder.
   unsettled): fine on V:, a release blocker for a public build.
 - The 16 spark-roadtrip and Vector Toss games are installed as betas. Should beta games show in
   the launcher by default, or behind an opt-in like Steam's?
+- (16 Nov) The iGame3D Editor's 2008 texts (`LIB_GAMES/igame3D_2008_Texts`) are not in git, so
+  the installer can't ship them: its library stays on your PC only. Track them (rights?), ship
+  them some other way, or leave the editor's library empty when installed?
+- (16 Nov) The uninstaller now keeps a whole game folder when it holds a file it didn't install.
+  Should it also keep one whose installed files were changed (a mod made in place, as Alex did)?
+  That needs a size or hash per file in `uninstall.log`.
+- (16 Nov) The Desktop shortcut moved to the Public Desktop (every account sees it, Lee's case).
+  Keep it there, or put it on the installing user's Desktop as before?

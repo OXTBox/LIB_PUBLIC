@@ -113,20 +113,9 @@ def config(m):
 
 
 def libs_today(m, exe_dir=None):
-    """Today: <exe folder>\\vibeapps and the paths in its libraryfolders.txt."""
-    lib = os.path.join(exe_dir or m.install_dir, vi.APPS_DIR)
-    mm = vi.Machine.__new__(vi.Machine)
-    mm.__dict__.update(m.__dict__)
-    mm_install = os.path.dirname(lib)
-    libs = [lib] if os.path.isdir(lib) else []
-    lf = os.path.join(lib, "libraryfolders.txt")
-    if os.path.exists(lf):
-        for p in re.findall(r'"path"\s+"([^"]+)"', open(lf, encoding="utf-8").read()):
-            cand = os.path.join(m.wsl(p), vi.APPS_DIR)
-            if cand not in libs and os.path.isdir(cand):
-                libs.append(cand)
-    del mm, mm_install
-    return libs
+    """Today: <exe folder>\\vibeapps and the paths in its libraryfolders.txt (relative to the
+    exe, or with a drive letter), as the launcher reads them."""
+    return vi.library_list(m, exe_dir or m.install_dir)
 
 
 def libs_proposed(m, exe_dir=None):
@@ -273,18 +262,18 @@ def s_sam():
     usb = m.drives["E"]
     port = os.path.join(usb, "Vibecode3D")
     shutil.copytree(vi.ENGINE_BUILD, port, dirs_exist_ok=True)
-    pm = vi.Machine(m.drive, m.user, letter="C")
-    pm.drives = dict(m.drives)
     pm_lib = os.path.join(port, vi.APPS_DIR)
     for g in ("Antack", "uDead"):
         put_install(m, [g])
     shutil.copytree(os.path.join(m.library), pm_lib, dirs_exist_ok=True)
     with open(os.path.join(port, "portable.txt"), "w") as f:
         f.write("keep settings and saves beside the exe\n")
-    lf = os.path.join(pm_lib, "libraryfolders.txt")
-    with open(lf, "w") as f:
-        f.write('"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"E:\\\\Vibecode3D"\n\t}\n'
-                '\t"1"\n\t{\n\t\t"path"\t\t"E:\\\\MoreGames"\n\t}\n}\n')
+    pm = vi.Machine(m.drive, m.user, letter="C", exe_dir=port)     # the engine as run from the stick
+    pm.drives = m.drives
+    # the launcher's "add library folder": E:\MoreGames, on the exe's own drive, so written relative
+    vi.write_libraryfolders(pm, pm_lib, [os.path.join(usb, "MoreGames")], exe_dir=port)
+    written = open(os.path.join(pm_lib, "libraryfolders.txt"), encoding="utf-8").read()
+    rel = re.findall(r'"path"\s+"([^"]+)"', written)
     os.makedirs(os.path.join(usb, "MoreGames", vi.APPS_DIR, "common"), exist_ok=True)
     shutil.copytree(os.path.join(pm_lib, "common", "uDead"),
                     os.path.join(usb, "MoreGames", vi.APPS_DIR, "common", "uDead"), dirs_exist_ok=True)
@@ -294,15 +283,18 @@ def s_sam():
     m.add_drive("F", usb)
     after = titles(m, libs_today(m, port))
     after_p = titles(m, libs_proposed(m, port))
-    saves_host = os.path.isdir(m.settings_dir)
+    # portable: settings, cache and the Data folder beside the exe, so they travel with the stick
+    save = write_save(pm, "uDead")
+    on_stick = all(p.startswith(port + "/") for p in (pm.settings_dir, pm.cache_dir, pm.data_root_default, save))
     result("sam", "carries the engine and games on a USB stick; at a friend's PC it is F: not E:",
-           f"{before} titles at home, {after} at the friend's (the second library was written as E:\\...): DEGRADED. "
-           f"Settings go to the friend's AppData ({'there' if saves_host else 'nothing there yet'}); "
-           "portable.txt does nothing yet",
-           f"{after_p} titles: libraries written relative to the exe when on the same drive, and a drive scan",
-           "write library paths relative to the exe when they share a drive; honour portable.txt "
-           "(settings and Data beside the exe); FAT32 sticks lose Mark of the Web and file times to 2 s",
-           f"home {before} / friend {after} / proposed {after_p}")
+           (f"{before} titles at home, {after} at the friend's: " + ("WORKS" if after == before else "DEGRADED")
+            + f" (the second library is written {rel[0] if rel else '?'}, relative to the exe). "
+            + ("portable.txt: settings, cache and saves stay on the stick (" + pm.win(pm.data_root_default) + "), "
+               "the friend's AppData is not touched: WORKS" if on_stick else "portable.txt ignored: BROKEN")),
+           f"{after_p} titles (also a drive scan for libraries)",
+           "done: library paths relative to the exe on its drive; portable.txt honoured. Left: FAT32 sticks "
+           "lose Mark of the Web and file times to 2 s",
+           f"home {before} / friend {after} / proposed {after_p}; libraryfolders path {rel}")
 
 
 def s_riley():
@@ -316,13 +308,22 @@ def s_riley():
     manifests = [f for f in os.listdir(m.library) if f.startswith("appmanifest_")]
     t = titles(m, libs_today(m))
     tp = titles(m, libs_proposed(m))
+    # she adds D:\Games as a library (another drive: written with its letter); the manifests are
+    # a cache, rebuilt from each folder's game.txt
+    newlib = os.path.join(m.drives["D"], "Games", vi.APPS_DIR)
+    vi.write_libraryfolders(m, m.library, [os.path.dirname(newlib)])
+    t2 = titles(m, libs_today(m))
+    w, r = vi.rebuild_manifests(m, libs_today(m))
+    left = [f for f in os.listdir(m.library) if f.startswith("appmanifest_")]
+    moved = [f for f in os.listdir(newlib) if f.startswith("appmanifest_")]
     result("riley", "drags vibeapps\\common to D:\\Games to free the small SSD",
-           f"{t} titles; {len(manifests)} appmanifests now point at nothing (Steam shows them as "
-           "'needs update' and offers to download again): BROKEN",
-           f"{tp} titles: the scan finds D:\\Games\\vibeapps; manifests are rebuilt from each game.txt",
-           "a 'Move install folder' command in the launcher; rebuild appmanifests from game.txt; "
-           "never trust a manifest over the folder",
-           f"saves untouched: {os.path.isfile(p)}")
+           f"{t} titles until she adds D:\\Games as a library, then {t2}. Manifests rebuilt from game.txt: "
+           f"{r} removed that pointed at nothing, {len(moved)} written beside the games on D: "
+           f"({len(manifests)} before, {len(left)} left on C:): " + ("WORKS" if t2 > 0 and len(moved) else "BROKEN"),
+           f"{tp} titles with no help: the scan finds D:\\Games\\vibeapps",
+           "done: appmanifests rebuilt from game.txt (vibeinstall.py manifests). Left: a 'Move install "
+           "folder' command and the drive scan in the launcher",
+           f"saves untouched: {os.path.isfile(p)}; manifests written {w}")
 
 
 def s_jordan():
@@ -356,7 +357,14 @@ def s_pat():
     keep = os.path.join(m.drives["D"], "MyGames")
     for g in ("Antack", "uDead"):
         shutil.copytree(os.path.join(m.library, "common", g), os.path.join(keep, g))
-    stray = vi.uninstall(m, purge=False)
+    # and a level of his own, left in the installed Thrmnlra folder
+    mine = os.path.join(m.library, "common", "Thrmnlra", "my_level.txt")
+    with open(mine, "w", encoding="utf-8") as f:
+        f.write("pat's level\n")
+    stray = vi.uninstall(m, purge=False, say=lambda *a: None)
+    kept = [os.path.basename(k) for k in vi.uninstall.kept]
+    whole = os.path.isfile(mine) and os.path.isfile(os.path.join(m.library, "common", "Thrmnlra", "game.txt"))
+    gone = not os.path.isdir(os.path.join(m.library, "common", "Canyon"))
     rc, out = play_cmd_dryrun(m, os.path.join(keep, "Antack"))
     # Linux later: case-sensitive. Do the games ask for the names they ship with?
     case_bad = []
@@ -368,14 +376,16 @@ def s_pat():
             if short and not os.path.exists(os.path.join(folder, short)):
                 case_bad.append(f"{g}: {short}")
     result("pat", "copies two game folders to D:\\MyGames, uninstalls Vibecode3D, double-clicks Play Antack.cmd",
-           f"uninstall leaves {len(stray)} files (settings, saves, logs). The .cmd "
+           f"uninstall keeps {', '.join(kept) or 'no'} game folder (it held his own file; "
+           + ("kept whole, " if whole else "NOT kept whole, ") + ("the others removed" if gone else "others left too")
+           + f"): WORKS. It leaves {len(stray)} files (settings, saves, logs, the kept folder). The .cmd "
            + ("still finds the engine (engine_path.txt survived, the exe did not?)" if rc == 0 else
               "says 'Vibecode3D is not installed on this PC, or was moved' (clear, but the game cannot run "
               "without the engine): DEGRADED"),
            "the game folder stands alone with a portable engine zip: unzip the engine anywhere, run it once, "
            "and every .cmd finds it through engine_path.txt; the engine scans for loose game folders",
-           "publish the engine as a zip as well as an installer; on first run, write engine_path.txt; "
-           "the uninstaller asks before deleting game folders and saves (Steam deletes steamapps)"
+           "publish the engine as a zip as well as an installer; on first run, write engine_path.txt. "
+           "Done: the uninstaller keeps a game folder that holds files it didn't install"
            + ("; case: " + "; ".join(case_bad) if case_bad else "; names match their files exactly (Linux-safe)"),
            out.splitlines()[0] if out else str(rc))
 
@@ -400,22 +410,21 @@ def s_chris():
     m = new_pc("chris")
     put_install(m)
     alt = os.path.join(m.drives["D"], "VibeData")
-    with open(os.path.join(m.settings_dir, "data_root.txt"), "w") as f:
-        f.write("D:\\VibeData")
+    vi.set_data_root(m, alt)                # Data.SetRoot: data_root.txt + the forwarding line
     p = write_save(m, data_root=alt)
     shutil.rmtree(m.settings_dir)
     shutil.rmtree(m.cache_dir)
     shutil.rmtree(os.path.join(m.local, "Temp"), ignore_errors=True)
-    root_after = m.data_root_default        # nothing says D:\VibeData any more
+    root_after, how = vi.data_root(m)       # data_root.txt is gone
     found = os.path.isfile(save_path(m, "Antack", data_root=root_after))
     t = titles(m, libs_today(m))
     result("chris", "chose D:\\VibeData as the Data folder, then a cleaner wiped AppData",
-           f"games still listed ({t}); but data_root.txt was in AppData, so the engine goes back to "
-           f"Documents\\Data and the saves on D: look gone: {'WORKS' if found else 'BROKEN (saves are safe on D:, just not found)'}",
-           "WORKS: a second copy of the choice lives in the default Data folder (Documents\\Data\\ROOT.md "
-           "says 'moved to D:\\VibeData'), and the engine offers to find a Data folder by its ROOT.md",
-           "keep only disposable things in AppData; leave a forwarding note in Documents\\Data when the "
-           "Data folder moves (LIB_DATA: Data.SetRoot)",
+           f"games still listed ({t}); data_root.txt was in AppData, but LIB_DATA follows {how} in "
+           f"Documents\\Data to {m.win(root_after)}: "
+           + ("WORKS, the saves on D: are found" if found else "BROKEN (saves are safe on D:, just not found)"),
+           "WORKS (the same, and the engine could also offer to find a Data folder by its ROOT.md)",
+           "done in LIB_DATA (branch data-forwarding): Data.SetRoot leaves 'Moved to: D:/VibeData' in "
+           "Documents\\Data\\ROOT.md and Data.Root follows it. Left: the engine and games using LIB_DATA's Data.Root",
            f"save still on disk at {m.win(p)}: {os.path.isfile(p)}")
 
 
@@ -428,14 +437,15 @@ def s_lee():
     os.makedirs(kid.home, exist_ok=True)
     t = titles(kid, libs_today(kid))
     cfg = os.path.isdir(kid.settings_dir)
-    desk = os.path.exists(os.path.join(kid.desktop, "Vibecode3D.lnk")) or os.path.exists(os.path.join(kid.desktop, "Vibecode3D.url"))
+    desk = any(os.path.exists(os.path.join(d, f)) for d in (kid.desktop, kid.public_desktop)
+               for f in ("Vibecode3D.lnk", "Vibecode3D.url"))
     their_saves = os.path.isdir(os.path.join(kid.data_root_default, "Users"))
     result("lee", "installed it; the second Windows account starts it from the Start Menu",
            f"{t} titles (the library is per machine); no settings yet ({'made' if cfg else 'the launcher must make them'}); "
-           f"no Desktop shortcut ({'there' if desk else 'it went to the installer’s Desktop only'}); "
+           f"{'a Desktop shortcut (Public Desktop, every account)' if desk else 'no Desktop shortcut (the installer’s Desktop only)'}; "
            f"saves are per account ({'shared?' if their_saves else 'separate'}): WORKS with notes",
            "WORKS: shortcuts in Public Desktop and the shared Start Menu; settings made on first run",
-           "make settings on first run, never at install; put the Desktop shortcut in C:\\Users\\Public\\Desktop")
+           "make settings on first run, never at install. Done: the Desktop shortcut is in C:\\Users\\Public\\Desktop")
 
 
 def s_taylor():
@@ -604,8 +614,11 @@ PROBE_FNS = [probe_parens, probe_unicode_setp, probe_longpath, probe_reserved, p
 def report():
     when = datetime.datetime.now().strftime("%A, %B %d, %Y %H:%M")
     L = [f"# Escape simulation: results\n\n{when}. Made by `escape_sim.py`; the scenarios are explained in "
-         "`README.md`, the personas in `LIB_USERS/personas/PERSONAS.md`. TODAY is the install as built; "
-         "PROPOSED is the design in `LAYOUT.md` section 5, modelled here, not yet in the engine.\n",
+         "`README.md`, the personas in `LIB_USERS/personas/PERSONAS.md`. TODAY is the install as built, "
+         "which since 16 Nov has the games' Game.FindFile (LIB_GAMES install-findfile), library paths "
+         "relative to the exe, portable.txt, appmanifests rebuilt from game.txt, an uninstaller that keeps "
+         "game folders holding your own files, and the Public Desktop shortcut. PROPOSED is the rest of "
+         "`LAYOUT.md` section 5, modelled here, not yet in the engine.\n",
          "## Personas\n", "| Who | Did | Today | Proposed | Fix |", "|---|---|---|---|---|"]
     for r in RESULTS:
         L.append(f"| {r['who']} | {r['did']} | {r['today']} | {r['proposed']} | {r['fix']} |")

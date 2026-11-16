@@ -6,7 +6,7 @@ in for any PC's C:), and a simulation of what real people do to it. Made 2026-11
 | File | What |
 |---|---|
 | `LAYOUT.md` | where everything goes, Steam and Windows side by side; what broke; the proposed design; questions |
-| `vibeinstall.py` | the installer: `install`, `verify`, `status`, `uninstall [--purge]`, `catalog` |
+| `vibeinstall.py` | the installer: `install`, `verify`, `status`, `uninstall [--purge]`, `manifests`, `catalog`. Public games come from LIB_GAMES `install-findfile` while it exists (else main) |
 | `catalog.tsv` | the 50 titles with app ids, from LIB_GAMES `main` (public) and the `spark-roadtrip` and `vector-toss` branches (betas) |
 | `escape_sim.py` | gives each persona a simulated PC (`V:\_SimPCs\<id>\C`, `D`, `E`), plays out their habits, then runs real Windows probes |
 | `ESCAPES_RESULTS.md` | the last run: each persona TODAY and with the PROPOSED design, and the probe results |
@@ -18,7 +18,8 @@ python3 -I vibeinstall.py verify           # can each game start and find its fi
 python3 -I escape_sim.py                   # all personas + probes (about 10 minutes), writes ESCAPES_RESULTS.md
 python3 -I escape_sim.py --only riley      # one persona
 python3 -I escape_sim.py --clean           # remove V:\_SimPCs
-python3 -I vibeinstall.py uninstall        # what a real uninstaller does: settings and saves stay
+python3 -I vibeinstall.py manifests        # rebuild every appmanifest from the game folders' game.txt
+python3 -I vibeinstall.py uninstall        # what a real uninstaller does: settings, saves and game folders holding your own files stay
 ```
 
 Games are taken from the LIB_GAMES branches with `git archive` / `git show`, so the owner's

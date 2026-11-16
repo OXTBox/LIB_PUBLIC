@@ -10,7 +10,12 @@ way real people do and see what still works.
   python3 -I vibeinstall.py verify    [--drive /mnt/v] [--user NAME]
   python3 -I vibeinstall.py status    [--drive /mnt/v]
   python3 -I vibeinstall.py uninstall [--drive /mnt/v] [--purge]
+  python3 -I vibeinstall.py manifests [--drive /mnt/v]    (rebuild appmanifests from each game.txt)
   python3 -I vibeinstall.py catalog                       (rebuild catalog.tsv from LIB_GAMES)
+
+The public games come from LIB_GAMES branch install-findfile (the games' Game.FindFile, LAYOUT
+5.1) while it exists, else from main. Library paths on the exe's own drive are written relative
+to the exe; portable.txt beside the exe keeps settings, cache and the Data folder beside it.
 
 --user NAME: a persona from LIB_USERS/personas/personas.tsv, whose profile is V:\\Users\\NAME.
 Without it the profile is the drive root itself (V:\\AppData, V:\\Documents), as the owner set up.
@@ -19,7 +24,7 @@ Nothing is written to the real Windows registry; what would be is in _simulated_
 import argparse, csv, datetime, io, os, re, shutil, subprocess, sys, tarfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PROJECTS = os.path.abspath(os.path.join(HERE, "..", ".."))
+PROJECTS = os.environ.get("VIBE_PROJECTS") or os.path.abspath(os.path.join(HERE, "..", ".."))
 GAMES_REPO = os.path.join(PROJECTS, "LIB_GAMES")
 ENGINE_BUILD = os.path.join(PROJECTS, "Vibecode3D", "standalone", "VibeCode3D", "Windows x86-64")
 PERSONAS = os.path.join(PROJECTS, "LIB_USERS", "personas", "personas.tsv")
@@ -32,6 +37,7 @@ COMMON_ID = 1000                            # Steam: 228980 "Steamworks Common R
 DEV_PREFIX = "LIB_GAMES/Vibecode3D_Games/"  # where the games' FindFile looks today
 REPO_PREFIX = "Vibecode3D_Games/"         # the same folder inside the LIB_GAMES repo
 OWNER_ONLY = "//wsl$/Ubuntu/home/igame3d/projects/"   # their last fallback: the owner's PC only
+PUBLIC_REF = "install-findfile"   # LIB_GAMES branch with Game.FindFile; main once it is merged
 
 # ---------------------------------------------------------------- paths
 
@@ -39,8 +45,9 @@ OWNER_ONLY = "//wsl$/Ubuntu/home/igame3d/projects/"   # their last fallback: the
 class Machine:
     """A Windows PC whose system drive is a folder in WSL (default /mnt/v = V:)."""
 
-    def __init__(self, drive="/mnt/v", user=None, letter=None):
+    def __init__(self, drive="/mnt/v", user=None, letter=None, exe_dir=None):
         self.drive = drive.rstrip("/")
+        self.exe_dir = exe_dir            # where the exe runs from (default: install_dir)
         self.letter = letter or ("V" if self.drive == "/mnt/v" else "V")
         self.user = user
         self.drives = {self.letter: self.drive}     # other letters: add_drive
@@ -53,6 +60,7 @@ class Machine:
         redirect = self.persona.get("documents", "")
         self.documents = os.path.join(home, *redirect.split("\\")) if redirect else os.path.join(home, "Documents")
         self.desktop = os.path.join(home, "Desktop")
+        self.public_desktop = os.path.join(self.drive, "Users", "Public", "Desktop")   # every account
         self.downloads = os.path.join(home, "Downloads")
         self.program_files = os.path.join(self.drive, "Program Files (x86)")
         self.start_menu = os.path.join(self.drive, "ProgramData", "Microsoft", "Windows", "Start Menu", "Programs")
@@ -67,15 +75,29 @@ class Machine:
         return os.path.join(self.install_dir, APPS_DIR)
 
     @property
+    def exe_folder(self):
+        return self.exe_dir or self.install_dir
+
+    @property
+    def portable(self):               # portable.txt beside the exe: everything stays beside it
+        return os.path.isfile(os.path.join(self.exe_folder, "portable.txt"))
+
+    @property
     def settings_dir(self):           # per-user settings, roams with the profile
+        if self.portable:
+            return os.path.join(self.exe_folder, "Settings")
         return os.path.join(self.roaming, PRODUCT)
 
     @property
     def cache_dir(self):              # this machine only: logs, crash dumps, cache
+        if self.portable:
+            return os.path.join(self.exe_folder, "Cache")
         return os.path.join(self.local, PRODUCT)
 
     @property
-    def data_root_default(self):      # LIB_DATA: Documents/Data
+    def data_root_default(self):      # LIB_DATA: Documents/Data (portable: Data beside the exe)
+        if self.portable:
+            return os.path.join(self.exe_folder, "Data")
         return os.path.join(self.documents, "Data")
 
     def add_drive(self, letter, path):
@@ -89,6 +111,27 @@ class Machine:
                 rel = os.path.relpath(path, root)
                 return letter + ":\\" + ("" if rel == "." else rel.replace("/", "\\"))
         return path
+
+    def drive_of(self, path):
+        """The letter of the simulated drive that holds a WSL path."""
+        for letter, root in sorted(self.drives.items(), key=lambda kv: -len(kv[1])):
+            if path == root or path.startswith(root + "/"):
+                return letter
+        return None
+
+    def lib_path(self, folder, exe_dir=None):
+        """How a library folder is written down: relative to the exe when on the same drive
+        (a USB stick that comes up as another letter still works), else with its letter."""
+        exe_dir = exe_dir or self.exe_folder
+        if self.drive_of(folder) and self.drive_of(folder) == self.drive_of(exe_dir):
+            return os.path.relpath(folder, exe_dir).replace("/", "\\")
+        return self.win(folder)
+
+    def lib_resolve(self, written, exe_dir=None):
+        """A library path as written (relative to the exe, or with a letter) -> WSL path."""
+        if re.match(r"^[A-Za-z]:", written) or written.startswith("\\\\"):
+            return self.wsl(written)
+        return os.path.normpath(os.path.join(exe_dir or self.exe_folder, written.replace("\\", "/")))
 
     def wsl(self, winpath):
         p = winpath.replace("\\", "/")
@@ -135,6 +178,23 @@ def pretty(key):
     s = key.replace("_", " ")
     s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", s)
     return s[:1].upper() + s[1:]
+
+
+_SRC = {}
+
+
+def src_ref(ref):
+    """Where a public game is installed from: PUBLIC_REF (the Game.FindFile branch) while it
+    exists, else main. Betas come from their own branch."""
+    if ref != "main":
+        return ref
+    if "main" not in _SRC:
+        try:
+            git("rev-parse", "--verify", "-q", PUBLIC_REF)
+            _SRC["main"] = PUBLIC_REF
+        except subprocess.CalledProcessError:
+            _SRC["main"] = "main"
+    return _SRC["main"]
 
 
 def blob_id(ref, path):
@@ -204,6 +264,21 @@ def kv(d):
     return "".join(f'\t"{k}"\t\t"{v}"\n' for k, v in d.items())
 
 
+def write_libraryfolders(m, library, folders, log=None, exe_dir=None):
+    """libraryfolders.txt in a library: the OTHER libraries (the one beside the exe is always
+    first and implied). Each path relative to the exe when on its drive, else with its letter."""
+    body = '"libraryfolders"\n{\n'
+    for i, f in enumerate(folders):
+        body += f'\t"{i}"\n\t{{\n' + kv({"path": m.lib_path(f, exe_dir)}).replace("\t\"", "\t\t\"") + "\t}\n"
+    body += "}\n"
+    path = os.path.join(library, "libraryfolders.txt")
+    if log:
+        write(log, path, body)
+    else:
+        os.makedirs(library, exist_ok=True)
+        open(path, "w", encoding="utf-8").write(body)
+
+
 def extract(ref, gitpath, dest, log, repo=GAMES_REPO):
     """Copy a folder of a LIB repo at ref into dest (no checkout, the owner's copy untouched)."""
     data = git("archive", "--format=tar", ref, gitpath, binary=True, cwd=repo)
@@ -226,7 +301,7 @@ ENGINE_FILES = [
     ("LIB_GAMES/tools/GameNotes.livecodescript", "GameNotes.livecodescript"),
 ]
 # the launcher standalone, saved by OXT-Beyond (LIB_PUBLIC/launcher/README.md)
-LAUNCHER_DIR = os.path.join(HERE, "..", "launcher", "build", "Vibecode3D Library", "Windows x86-64")
+LAUNCHER_DIR = os.path.join(PROJECTS, "LIB_PUBLIC", "launcher", "build", "Vibecode3D Library", "Windows x86-64")
 # the player logs to the owner's inbox; installed, it logs to the uErrorFile the launcher sets
 PLAYER_LOG_OLD = 'GL.Projects() & "/LIB_LLMIN/LIB_DEV/GAME_PLAYER_ERRORS.txt"'
 PLAYER_LOG_NEW = 'the uErrorFile of me'
@@ -277,6 +352,8 @@ def play_cmd(game_dir_name):
 
 def install(m, games=None, with_engine=True, quiet=False):
     log = Log(m)
+    old_logf = os.path.join(m.install_dir, "uninstall.log")
+    old_log = open(old_logf, encoding="utf-8").read().splitlines() if os.path.exists(old_logf) else []
     cat = [g for g in read_catalog() if not games or g["key"] in games]
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     say = (lambda *a: None) if quiet else print
@@ -314,12 +391,10 @@ def install(m, games=None, with_engine=True, quiet=False):
     common = os.path.join(m.library, "common")
     for sub in ("downloading", "temp", os.path.join("workshop", "content")):
         os.makedirs(os.path.join(m.library, sub), exist_ok=True)
-    write(log, os.path.join(m.library, "libraryfolders.txt"),
-          '"libraryfolders"\n{\n\t"0"\n\t{\n' + kv({"path": m.win(m.install_dir)}).replace("\t\"", "\t\t\"")
-          + "\t}\n}\n")
+    write_libraryfolders(m, m.library, [], log)
     # shared scripts every game may load: Steam's Common Redistributables
     redist = os.path.join(common, "Vibecode3D Common")
-    extract("main", REPO_PREFIX + "Sequencer", os.path.join(redist, "Sequencer"), log)
+    extract(src_ref("main"), REPO_PREFIX + "Sequencer", os.path.join(redist, "Sequencer"), log)
     for repo, ref, sub in COMMON_LIBS:
         try:
             extract(ref, sub, os.path.join(redist, repo, sub), log, repo=os.path.join(PROJECTS, repo))
@@ -343,13 +418,15 @@ def install(m, games=None, with_engine=True, quiet=False):
     for g in cat:
         folder = os.path.join(common, g["name"])
         script = f"Vibecode3D_Play_{g['key']}.livecodescript"
-        blob = git("show", f"{g['ref']}:{REPO_PREFIX}{script}", binary=True)
+        ref_from = src_ref(g["ref"])
+        blob = git("show", f"{ref_from}:{REPO_PREFIX}{script}", binary=True)
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, script), "wb") as f:
             f.write(blob)
         log.made(os.path.join(folder, script))
         for d in filter(None, g["data"].split(",")):
-            ref = g["ref"] if d in git("ls-tree", "--name-only", g["ref"], REPO_PREFIX) else (g["betas"].split(",")[0] or "main")
+            ref = ref_from if REPO_PREFIX + d in git("ls-tree", "--name-only", ref_from, REPO_PREFIX).split() \
+                else src_ref(g["betas"].split(",")[0] or "main")
             try:
                 extract(ref, REPO_PREFIX + d, os.path.join(folder, d), log)
             except subprocess.CalledProcessError:
@@ -357,7 +434,7 @@ def install(m, games=None, with_engine=True, quiet=False):
         # self-describing: a loose copy of this folder still says what it is
         write(log, os.path.join(folder, "game.txt"),
               f"appid\t{g['appid']}\nname\t{g['name']}\nkind\t{g['kind']}\nscript\t{script}\n"
-              f"data\t{g['data']}\nbranch\t{g['branch']}\nref\t{g['ref']}\nengine\t{VERSION}\n")
+              f"data\t{g['data']}\nbranch\t{g['branch']}\nref\t{ref_from}\nengine\t{VERSION}\n")
         write(log, os.path.join(folder, f"Play {g['name']}.cmd"), play_cmd(g["name"]), "")
         write(log, os.path.join(m.library, f"appmanifest_{g['appid']}.txt"),
               '"AppState"\n{\n' + kv({"appid": g["appid"], "name": g["name"], "installdir": g["name"],
@@ -365,8 +442,11 @@ def install(m, games=None, with_engine=True, quiet=False):
                                       "BetaKey": g["betas"] if g["branch"] == "beta" else ""}) + "}\n")
 
     # 3. per-user: settings (Roaming), machine cache and logs (Local), the Data folder (Documents)
+    # config.txt keeps the library's full path: it is how an exe copied out of its folder (or run
+    # from a zip) still finds the library, so it can't be relative to the exe
     write(log, os.path.join(m.settings_dir, "config.txt"),
-          f"user\t{m.user or 'default'}\nlibrary\t{m.win(m.library)}\nlanguage\tenglish\n")
+          f"user\t{m.user or 'default'}\nlibrary\t{m.win(m.library)}\nlanguage\tenglish\n"
+          + ("portable\ttrue\n" if m.portable else ""))
     write(log, os.path.join(m.settings_dir, "engine_path.txt"), m.win(os.path.join(m.install_dir, "Vibecode3D.exe")), "")
     os.makedirs(os.path.join(m.cache_dir, "logs"), exist_ok=True)
     os.makedirs(os.path.join(m.cache_dir, "crashdumps"), exist_ok=True)
@@ -386,11 +466,30 @@ def install(m, games=None, with_engine=True, quiet=False):
         # drive's, so point the install at this drive's Data folder (GameNotes reads it)
         write(log, os.path.join(m.install_dir, "data_root.txt"), m.win(data), "")
 
-    # 4. shortcuts (real .lnk files when PowerShell is there)
-    shortcut(m, log, os.path.join(m.desktop, "Vibecode3D.lnk"), os.path.join(m.install_dir, "Vibecode3D.exe"))
+    # 4. shortcuts (real .lnk files when PowerShell is there): the Public Desktop and the shared
+    # Start Menu, so every Windows account on the PC sees them
+    shortcut(m, log, os.path.join(m.public_desktop, "Vibecode3D.lnk"), os.path.join(m.install_dir, "Vibecode3D.exe"))
     shortcut(m, log, os.path.join(m.start_menu, "Vibecode3D", "Vibecode3D.lnk"), os.path.join(m.install_dir, "Vibecode3D.exe"))
 
+    # an update: what the last install made and this one didn't (an old shortcut place, a title
+    # gone from the catalog) goes, as an updater would; settings and the Data folder never
+    # (only on a whole install: a one-game repair keeps the rest)
+    pruned = 0
+    if not games:
+        now_made = set(log.lines)
+        for line in old_log:
+            p = m.wsl(line)
+            if not line or line in now_made or p.startswith((m.roaming, m.documents, m.local)):
+                continue
+            if os.path.isfile(p):
+                os.remove(p)
+                pruned += 1
+    else:
+        now_made = set(log.lines)
+        log.lines += [ln for ln in old_log if ln and ln not in now_made]
     write(log, os.path.join(m.install_dir, "uninstall.log"), "\r\n".join(log.lines) + "\r\n", "")
+    if pruned:
+        say(f"  removed {pruned} files the last install made and this one doesn't")
     say(f"installed {len(cat)} titles + common into {m.win(m.install_dir)}; {len(log.lines)} files logged")
     return log
 
@@ -408,25 +507,67 @@ def shortcut(m, log, lnk, target):
     write(log, lnk[:-4] + ".url", f"[InternetShortcut]\r\nURL=file:///{m.win(target)}\r\n", "")
 
 
-def uninstall(m, purge=False):
+def kept_game_folders(m, installed):
+    """Game folders in the library that hold a file the installer did not put there (a mod, a
+    level the player made, a save): the uninstaller leaves the whole folder and its manifest."""
+    keep = []
+    common = os.path.join(m.library, "common")
+    for name in safe_dirs(common):
+        folder = os.path.join(common, name)
+        for root, _d, files in os.walk(folder):
+            if any(os.path.join(root, fn) not in installed for fn in files):
+                keep.append(folder)
+                break
+    return keep
+
+
+def safe_dirs(d):
+    try:
+        return sorted(x for x in os.listdir(d) if os.path.isdir(os.path.join(d, x)))
+    except OSError:
+        return []
+
+
+def uninstall(m, purge=False, say=print):
     """Do what real uninstallers do: remove the files in uninstall.log and empty folders, and
-    leave settings, saves and anything added later (mods, logs) unless --purge."""
+    leave settings, saves and anything added later (mods, logs) unless --purge. A game folder
+    that holds a file the installer didn't put there is left whole, with its appmanifest
+    (uninstall.kept lists them after a run)."""
     logf = os.path.join(m.install_dir, "uninstall.log")
     left, gone = [], 0
+    uninstall.kept = []
     if os.path.exists(logf):
         with open(logf, encoding="utf-8") as f:
-            for line in f.read().splitlines():
-                if not line:
-                    continue
-                p = m.wsl(line)
-                keep = not purge and (p.startswith(m.roaming) or p.startswith(m.documents) or p.startswith(m.local))
-                if keep:
-                    left.append(line)
-                elif os.path.exists(p):
-                    os.remove(p)
-                    gone += 1
+            logged = [ln for ln in f.read().splitlines() if ln]
+        installed = {m.wsl(ln) for ln in logged}
+        kept = [] if purge else kept_game_folders(m, installed)
+        kept_ids = set()
+        for k in kept:
+            try:
+                kept_ids.add(read_game_txt(k).get("appid", ""))
+            except OSError:
+                pass
+        uninstall.kept = kept
+        for line in logged:
+            p = m.wsl(line)
+            keep = not purge and (p.startswith(m.roaming) or p.startswith(m.documents) or p.startswith(m.local))
+            keep = keep or any(p.startswith(k + "/") for k in kept)
+            mf = re.match(r"appmanifest_(\d+)\.txt$", os.path.basename(p))
+            keep = keep or bool(mf and mf.group(1) in kept_ids)
+            if keep:
+                left.append(line)
+            elif os.path.exists(p):
+                os.remove(p)
+                gone += 1
         if os.path.exists(logf):
             os.remove(logf)
+        if kept:
+            # what is left is still a library: write down what it holds
+            with open(os.path.join(m.library, "KEPT_BY_UNINSTALL.txt"), "w", encoding="utf-8") as f:
+                f.write("These game folders held files Vibecode3D did not install, so they were kept:\n"
+                        + "".join(m.win(k) + "\n" for k in kept))
+            say(f"kept {len(kept)} game folder(s) holding your own files: "
+                + ", ".join(os.path.basename(k) for k in kept))
     for top in (m.install_dir, os.path.join(m.start_menu, "Vibecode3D")) + ((m.settings_dir, m.cache_dir) if purge else ()):
         for root, dirs, files in os.walk(top, topdown=False):
             if not os.listdir(root):
@@ -435,7 +576,7 @@ def uninstall(m, purge=False):
     for top in (m.install_dir, m.settings_dir, m.cache_dir, m.data_root_default):
         for root, _d, files in os.walk(top):
             stray += [m.win(os.path.join(root, fn)) for fn in files]
-    print(f"removed {gone} files; left behind {len(stray)} (settings, saves, logs, anything added later)")
+    say(f"removed {gone} files; left behind {len(stray)} (settings, saves, logs, anything added later)")
     return stray
 
 
@@ -460,16 +601,50 @@ def game_folders(m, libraries=None):
     return out
 
 
-def library_list(m):
-    """The default library beside the exe, then those in libraryfolders.txt."""
-    libs = [m.library] if os.path.isdir(m.library) else []
-    lf = os.path.join(m.library, "libraryfolders.txt")
+def library_list(m, exe_dir=None):
+    """The library beside the exe, then those in its libraryfolders.txt (relative to the exe
+    or with a drive letter)."""
+    exe_dir = exe_dir or m.exe_folder
+    first = os.path.join(exe_dir, APPS_DIR)
+    libs = [first] if os.path.isdir(first) else []
+    lf = os.path.join(first, "libraryfolders.txt")
     if os.path.exists(lf):
         for p in re.findall(r'"path"\s+"([^"]+)"', open(lf, encoding="utf-8").read()):
-            lib = os.path.join(m.wsl(p), APPS_DIR)
+            lib = os.path.join(m.lib_resolve(p.replace("\\\\", "\\"), exe_dir), APPS_DIR)
             if lib not in libs and os.path.isdir(lib):
                 libs.append(lib)
     return libs
+
+
+def rebuild_manifests(m, libraries=None, now=None):
+    """Manifests are a cache: game.txt in each folder is the truth. In every library, write an
+    appmanifest for each game folder and remove the ones whose folder is gone.
+    Returns (written, removed)."""
+    now = now or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    written = removed = 0
+    for lib in libraries or library_list(m):
+        common = os.path.join(lib, "common")
+        have = {}
+        for folder in game_folders(m, [lib]):
+            g = read_game_txt(folder)
+            if not g.get("appid"):
+                continue
+            script = os.path.join(folder, g.get("script", ""))
+            size = os.path.getsize(script) if g.get("script") and os.path.isfile(script) else 0
+            name = os.path.basename(folder)
+            have[g["appid"]] = name
+            with open(os.path.join(lib, f"appmanifest_{g['appid']}.txt"), "w", encoding="utf-8") as f:
+                f.write('"AppState"\n{\n' + kv({"appid": g["appid"], "name": g.get("name", name), "installdir": name,
+                                                  "StateFlags": 4, "LastUpdated": now, "SizeOnDisk": size,
+                                                  "BetaKey": g.get("ref", "") if g.get("branch") == "beta" else ""}) + "}\n")
+            written += 1
+        for fn in os.listdir(lib) if os.path.isdir(lib) else []:
+            mm = re.match(r"appmanifest_(\d+)\.txt$", fn)
+            if mm and mm.group(1) not in have:
+                os.remove(os.path.join(lib, fn))
+                removed += 1
+        del common
+    return written, removed
 
 
 def read_game_txt(folder):
@@ -530,7 +705,11 @@ def verify(m, engine=None, libraries=None, owner_pc=True, quiet=False):
         else:
             txt = open(script, encoding="utf-8", errors="replace").read()
             asks = sorted(set(a for hit in ASKS.findall(txt) for a in hit.split(",") if a.startswith("LIB_")))
-            t = [(r, find_today(engine, r, m, owner_pc)) for r in asks]
+            # today = what the installed script does: Game.FindFile (it reads uScriptFile) looks in
+            # its own folder and Vibecode3D Common first, then walks up, then the owner's PC
+            new_lookup = "uScriptFile" in txt
+            t = [(r, "found" if new_lookup and find_proposed(folder, r, libs) == "found"
+                  else find_today(engine, r, m, owner_pc)) for r in asks]
             p = [(r, find_proposed(folder, r, libs)) for r in asks]
             if any(s == "missing" for _r, s in t):
                 row["today"] = "MISSING " + str(sum(s == "missing" for _r, s in t))
@@ -550,6 +729,41 @@ def verify(m, engine=None, libraries=None, owner_pc=True, quiet=False):
     return rows, problems
 
 
+# ---------------------------------------------------------------- the Data folder (LIB_DATA's rules)
+
+MOVED = "Moved to: "       # LIB_DATA's forwarding line in the default Data folder's ROOT.md
+
+
+def set_data_root(m, folder):
+    """Data.SetRoot: data_root.txt in the settings, and a forwarding line in the default
+    Documents\\Data\\ROOT.md (LIB_DATA branch data-forwarding)."""
+    os.makedirs(folder, exist_ok=True)
+    os.makedirs(m.settings_dir, exist_ok=True)
+    with open(os.path.join(m.settings_dir, "data_root.txt"), "w", encoding="utf-8") as f:
+        f.write(m.win(folder).replace("\\", "/"))
+    root_md = os.path.join(m.data_root_default, "ROOT.md")
+    os.makedirs(m.data_root_default, exist_ok=True)
+    keep = [ln for ln in (open(root_md, encoding="utf-8").read().splitlines() if os.path.exists(root_md) else ["# Data"])
+            if not ln.startswith(MOVED) and not ln.startswith("The Data folder moved")]
+    with open(root_md, "w", encoding="utf-8") as f:
+        f.write("\n".join(keep).rstrip("\n") + "\n\nThe Data folder moved (Data.SetRoot). Every tool follows "
+                "the line below when its saved choice is lost:\n" + MOVED + m.win(folder).replace("\\", "/") + "\n")
+
+
+def data_root(m):
+    """Data.Root: the saved choice, else the forwarding line in Documents\\Data\\ROOT.md when its
+    folder is there, else Documents\\Data. Returns (folder, how)."""
+    f = os.path.join(m.settings_dir, "data_root.txt")
+    if os.path.exists(f):
+        return m.wsl(open(f, encoding="utf-8").read().strip()), "data_root.txt"
+    root_md = os.path.join(m.data_root_default, "ROOT.md")
+    if os.path.exists(root_md):
+        for ln in open(root_md, encoding="utf-8").read().splitlines():
+            if ln.startswith(MOVED) and os.path.isdir(m.wsl(ln[len(MOVED):].strip())):
+                return m.wsl(ln[len(MOVED):].strip()), "ROOT.md forwarding line"
+    return m.data_root_default, "the default"
+
+
 def status(m):
     for label, p in (("program", m.install_dir), ("library", m.library), ("settings", m.settings_dir),
                      ("cache/logs", m.cache_dir), ("Data", m.data_root_default)):
@@ -559,7 +773,7 @@ def status(m):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "catalog"])
+    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "manifests", "catalog"])
     ap.add_argument("--drive", default="/mnt/v")
     ap.add_argument("--user")
     ap.add_argument("--purge", action="store_true")
@@ -578,6 +792,9 @@ def main():
         status(m)
     elif a.cmd == "uninstall":
         uninstall(m, a.purge)
+    elif a.cmd == "manifests":
+        w, r = rebuild_manifests(m)
+        print(f"wrote {w} appmanifests from game.txt, removed {r} that pointed at nothing")
 
 
 if __name__ == "__main__":
