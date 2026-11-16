@@ -164,6 +164,9 @@ COMMON_LIBS = [("LIB_BIT", "main", "livecode"), ("LIB_MAP", "main", "livecode"),
 DATA_DIRS = {"Antack": ["Antack"], "Thrmnlra": ["Thrmnlra"], "uDead": ["uDead"],
              "VectorToss": ["VectorToss", "Animations"]}
 REFS = ["main", "spark-roadtrip", "vector-toss"]      # main = public, the others = betas
+# held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
+# it ships as the standalone edition (LIB_GAMES ig3d-editor-standalone, STANDALONE_PLAN.md)
+HOLD = {"Ig3dEditor"}
 
 
 def git(*args, cwd=GAMES_REPO, binary=False):
@@ -354,7 +357,7 @@ def install(m, games=None, with_engine=True, quiet=False):
     log = Log(m)
     old_logf = os.path.join(m.install_dir, "uninstall.log")
     old_log = open(old_logf, encoding="utf-8").read().splitlines() if os.path.exists(old_logf) else []
-    cat = [g for g in read_catalog() if not games or g["key"] in games]
+    cat = [g for g in read_catalog() if (not games or g["key"] in games) and g["key"] not in HOLD]
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     say = (lambda *a: None) if quiet else print
 
@@ -484,6 +487,10 @@ def install(m, games=None, with_engine=True, quiet=False):
             if os.path.isfile(p):
                 os.remove(p)
                 pruned += 1
+                d = os.path.dirname(p)          # and folders left empty (a title held back)
+                while d.startswith(m.library + "/") and os.path.isdir(d) and not os.listdir(d):
+                    os.rmdir(d)
+                    d = os.path.dirname(d)
     else:
         now_made = set(log.lines)
         log.lines += [ln for ln in old_log if ln and ln not in now_made]
