@@ -385,6 +385,8 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
     if with_engine and os.path.isdir(ENGINE_BUILD):
         for root, _dirs, files in os.walk(ENGINE_BUILD):
             for fn in files:
+                if fn.lower() == "vibecode3d.exe" and os.path.isfile(os.path.join(LAUNCHER_DIR, "Vibecode3D Library.exe")):
+                    continue      # the old app: the Library program takes its place (below)
                 src = os.path.join(root, fn)
                 rel = os.path.relpath(src, ENGINE_BUILD)
                 dst = os.path.join(m.install_dir, rel)
