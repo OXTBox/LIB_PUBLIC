@@ -358,6 +358,20 @@ def play_cmd(game_dir_name):
         "start \"\" \"%ENGINE%\" -game \"%GAME%\"\r\n")
 
 
+def copy_unless_same(src, dst, say=print):
+    """Copy a program file, unless the same one is there already. A running program is locked
+    by Windows: then say so instead of stopping the install."""
+    if os.path.isfile(dst) and os.path.getsize(dst) == os.path.getsize(src):
+        with open(src, "rb") as a, open(dst, "rb") as b:
+            if a.read() == b.read():
+                return
+    try:
+        shutil.copy2(src, dst)
+    except PermissionError:
+        say(f"  {os.path.basename(dst)} is running (Windows locks it): close it, then install "
+            "again. The rest is installed.")
+
+
 def install(m, games=None, with_engine=True, quiet=False, include_held=False):
     log = Log(m)
     old_logf = os.path.join(m.install_dir, "uninstall.log")
@@ -421,7 +435,7 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
                 src = os.path.join(root, fn)
                 dst = os.path.join(m.install_dir, os.path.relpath(src, LAUNCHER_DIR))
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
-                shutil.copy2(src, dst)
+                copy_unless_same(src, dst, say)
                 log.made(dst)
         # the Library is the program now: Vibecode3D.exe (the Start Menu, the Desktop, every
         # "Play <Game>.cmd", engine_path.txt) is the same program, so no way in opens the old
@@ -429,11 +443,7 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
         lib_exe = os.path.join(LAUNCHER_DIR, "Vibecode3D Library.exe")
         if os.path.isfile(lib_exe):
             dst = os.path.join(m.install_dir, "Vibecode3D.exe")
-            try:
-                shutil.copy2(lib_exe, dst)
-            except PermissionError:
-                say("  Vibecode3D.exe is running (Windows locks it): close every Vibecode3D window, "
-                    "then install again. The rest is installed.")
+            copy_unless_same(lib_exe, dst, say)
             log.made(dst)
     write(log, os.path.join(redist, "game.txt"),
           f"appid\t{COMMON_ID}\nname\tVibecode3D Common\nkind\tredist\nscript\t\n")
