@@ -219,6 +219,36 @@ def extract(ref, gitpath, dest, log, repo=GAMES_REPO):
             log.made(out)
 
 
+# what the launcher loads to play a game, from the owner's projects (working copies)
+ENGINE_FILES = [
+    ("xt3D_Raylib_Livecode_Bridge/testbench/vibe_engine_xt3d.livecodescript", "vibe_engine_xt3d.livecodescript"),
+    ("LIB_DEV/livecode/game_player.livecodescript", "game_player.livecodescript"),
+    ("LIB_GAMES/tools/GameNotes.livecodescript", "GameNotes.livecodescript"),
+]
+# the launcher standalone, saved by OXT-Beyond (LIB_PUBLIC/launcher/README.md)
+LAUNCHER_EXE = os.path.join(HERE, "..", "launcher", "build", "Windows x86-64", "Vibecode3D Library.exe")
+# the player logs to the owner's inbox; installed, it logs to the uErrorFile the launcher sets
+PLAYER_LOG_OLD = 'GL.Projects() & "/LIB_LLMIN/LIB_DEV/GAME_PLAYER_ERRORS.txt"'
+PLAYER_LOG_NEW = 'the uErrorFile of me'
+
+
+def install_engine_files(dest, log, say=print):
+    os.makedirs(dest, exist_ok=True)
+    for rel, name in ENGINE_FILES:
+        src = os.path.join(PROJECTS, rel)
+        if not os.path.exists(src):
+            say(f"  (Engine: no {rel})")
+            continue
+        text = open(src, encoding="utf-8").read()
+        if name == "game_player.livecodescript":
+            if PLAYER_LOG_OLD not in text:
+                say("  (Engine: game_player's error log line changed; errors go to the owner's inbox)")
+            text = text.replace(PLAYER_LOG_OLD, PLAYER_LOG_NEW)
+        dst = os.path.join(dest, name)
+        open(dst, "w", encoding="utf-8", newline="").write(text)
+        log.made(dst)
+
+
 def play_cmd(game_dir_name):
     """Play <Game>.cmd: start this game without the launcher. Robust on purpose: no ( ) blocks,
     since "Program Files (x86)" closes them (the naive version is tried in escape_sim)."""
@@ -295,6 +325,12 @@ def install(m, games=None, with_engine=True, quiet=False):
             extract(ref, sub, os.path.join(redist, repo, sub), log, repo=os.path.join(PROJECTS, repo))
         except subprocess.CalledProcessError:
             say(f"  (Common: no {repo}/{sub} on {ref})")
+    # the engine the launcher plays games with (LIB_PUBLIC/launcher): Vibecode3D Common\Engine
+    install_engine_files(os.path.join(redist, "Engine"), log, say)
+    if with_engine and os.path.exists(LAUNCHER_EXE):
+        dst = os.path.join(m.install_dir, "Vibecode3D Library.exe")
+        shutil.copy2(LAUNCHER_EXE, dst)
+        log.made(dst)
     write(log, os.path.join(redist, "game.txt"),
           f"appid\t{COMMON_ID}\nname\tVibecode3D Common\nkind\tredist\nscript\t\n")
     write(log, os.path.join(m.library, f"appmanifest_{COMMON_ID}.txt"),
