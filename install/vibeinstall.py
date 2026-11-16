@@ -167,6 +167,8 @@ REFS = ["main", "spark-roadtrip", "vector-toss"]      # main = public, the other
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
 # it ships as the standalone edition (LIB_GAMES ig3d-editor-standalone, STANDALONE_PLAN.md)
 HOLD = {"Ig3dEditor"}
+# titles whose home moved out of LIB_GAMES (owner, 16 Nov): key -> (repo, ref, folder of the script)
+HOMES = {"GeneticAnomaly": ("LIB_GAD", "main", "GeneticAnomaly/")}
 
 
 def git(*args, cwd=GAMES_REPO, binary=False):
@@ -421,8 +423,13 @@ def install(m, games=None, with_engine=True, quiet=False):
     for g in cat:
         folder = os.path.join(common, g["name"])
         script = f"Vibecode3D_Play_{g['key']}.livecodescript"
-        ref_from = src_ref(g["ref"])
-        blob = git("show", f"{ref_from}:{REPO_PREFIX}{script}", binary=True)
+        if g["key"] in HOMES:
+            repo, ref_from, sub = HOMES[g["key"]]
+            blob = git("show", f"{ref_from}:{sub}{script}", binary=True, cwd=os.path.join(PROJECTS, repo))
+            ref_from = f"{repo} {ref_from}"
+        else:
+            ref_from = src_ref(g["ref"])
+            blob = git("show", f"{ref_from}:{REPO_PREFIX}{script}", binary=True)
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, script), "wb") as f:
             f.write(blob)
