@@ -226,7 +226,7 @@ ENGINE_FILES = [
     ("LIB_GAMES/tools/GameNotes.livecodescript", "GameNotes.livecodescript"),
 ]
 # the launcher standalone, saved by OXT-Beyond (LIB_PUBLIC/launcher/README.md)
-LAUNCHER_EXE = os.path.join(HERE, "..", "launcher", "build", "Windows x86-64", "Vibecode3D Library.exe")
+LAUNCHER_DIR = os.path.join(HERE, "..", "launcher", "build", "Vibecode3D Library", "Windows x86-64")
 # the player logs to the owner's inbox; installed, it logs to the uErrorFile the launcher sets
 PLAYER_LOG_OLD = 'GL.Projects() & "/LIB_LLMIN/LIB_DEV/GAME_PLAYER_ERRORS.txt"'
 PLAYER_LOG_NEW = 'the uErrorFile of me'
@@ -327,10 +327,14 @@ def install(m, games=None, with_engine=True, quiet=False):
             say(f"  (Common: no {repo}/{sub} on {ref})")
     # the engine the launcher plays games with (LIB_PUBLIC/launcher): Vibecode3D Common\Engine
     install_engine_files(os.path.join(redist, "Engine"), log, say)
-    if with_engine and os.path.exists(LAUNCHER_EXE):
-        dst = os.path.join(m.install_dir, "Vibecode3D Library.exe")
-        shutil.copy2(LAUNCHER_EXE, dst)
-        log.made(dst)
+    if with_engine and os.path.isdir(LAUNCHER_DIR):        # the exe and its Externals, beside Vibecode3D.exe
+        for root, _dirs, files in os.walk(LAUNCHER_DIR):
+            for fn in files:
+                src = os.path.join(root, fn)
+                dst = os.path.join(m.install_dir, os.path.relpath(src, LAUNCHER_DIR))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
+                log.made(dst)
     write(log, os.path.join(redist, "game.txt"),
           f"appid\t{COMMON_ID}\nname\tVibecode3D Common\nkind\tredist\nscript\t\n")
     write(log, os.path.join(m.library, f"appmanifest_{COMMON_ID}.txt"),
