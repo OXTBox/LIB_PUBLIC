@@ -19,7 +19,7 @@ ordinary PC's C: drive. The owner decides; nothing here is in the engine yet.
 | Downloads in progress | `steamapps\downloading\`, `temp\` | the same names | |
 | Per-user settings | `Steam\userdata\<id>\` and `Steam\config\` (in Program Files) | `%APPDATA%\Vibecode3D\` (`config.txt`, `engine_path.txt`, `data_root.txt`) | Roaming AppData: settings that follow the user |
 | Logs, crash dumps, cache | `Steam\logs\`, `Steam\dumps\` | `%LOCALAPPDATA%\Vibecode3D\logs`, `crashdumps` | Local AppData: this machine only, safe to lose |
-| Saves | each game picks: `Documents\My Games\`, `Saved Games\`, `AppData\LocalLow\<Studio>\`, `userdata\<id>\<appid>\remote\` | `Documents\Data\Users\<user>\Saves\<Game>\` (LIB_DATA's Data folder) | Documents: the user's own, backed up, visible |
+| Saves | each game picks: `Documents\My Games\`, `Saved Games\`, `AppData\LocalLow\<Studio>\`, `userdata\<id>\<appid>\remote\` | `Documents\My Games\<Game>\` (owner, 18 Nov: the standard place players expect); game edits (levels etc.) in `Documents\Vibecode3D\Data\Games\` | Documents: the user's own, backed up, visible. For now everything stays local to the app; moved in the release pass |
 | Tell the AI (the vibe) | none | in any game, ` or F2 opens the note box; each note is `Documents\Data\Games\<Game>\LIB_LLM\tell_<YYYY-MM-DD_HHMMSS>.txt` (game, when, the game's state, the note), for the player's own AI to read | Documents: the player's, survives a wiped AppData and an uninstall |
 | Start a game from outside | `steam://rungameid/<id>`, a desktop `.url` | `vibecode3d://run/<appid>` (written in `_simulated_registry.reg`, not registered), `Play <Game>.cmd`, `-game <folder>` | |
 | Shortcuts | Desktop + Start Menu | Public Desktop `.lnk` (`Users\Public\Desktop`, every account) + `ProgramData\Microsoft\Windows\Start Menu\Programs\Vibecode3D\` | |
@@ -115,8 +115,9 @@ holds files it didn't install, without asking). The installer now installs the p
 
 ## 6. Questions for the owner
 
-- Saves: `Documents\Data\Users\<user>\Saves\<Game>\` (LIB_DATA's Data folder, chosen here) or
-  Windows' own `Saved Games\Vibecode3D\` folder?
+- (decided 18 Nov) Saves: `Documents\My Games\<Game>\`, the standard; game edits in
+  `Documents\Vibecode3D\Data\Games\levels` etc. Until the release pass everything stays local
+  to the app/project. `V:\Users\Public` is the generic test-install account on the VIBE drive.
 - (decided 16 Nov) `LIB_MOCAP/library`: ship only the clips the working games use, plus ours
   (Video, proc); Animazoo credited (the product was given away free, the company is gone),
   FreeBVH credited to Carnegie Mellon. The iGame3D clips: only those a game uses.
