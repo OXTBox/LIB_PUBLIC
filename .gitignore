@@ -3,3 +3,9 @@
 __pycache__/
 *.pyc
 
+
+# screenshots and their bundles stay on disk (images are ignored)
+*.png
+*.jpg
+*.zip
+screens/Vibecode3D_xt3d_November_18_2026/
