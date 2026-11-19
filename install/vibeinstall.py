@@ -12,6 +12,8 @@ way real people do and see what still works.
   python3 -I vibeinstall.py uninstall [--drive /mnt/v] [--purge]
   python3 -I vibeinstall.py manifests [--drive /mnt/v]    (rebuild appmanifests from each game.txt)
   python3 -I vibeinstall.py catalog                       (rebuild catalog.tsv from LIB_GAMES)
+  python3 -I vibeinstall.py promote --games KEY[,KEY]     (the owner approved a beta: out of BETAS,
+                                                           catalog, installed game.txt, manifests)
 
 The public games come from LIB_GAMES branch install-findfile (the games' Game.FindFile, LAYOUT
 5.1) while it exists, else from main. Library paths on the exe's own drive are written relative
@@ -164,11 +166,9 @@ COMMON_LIBS = [("LIB_BIT", "main", "livecode"), ("LIB_MAP", "main", "livecode"),
 DATA_DIRS = {"Antack": ["Antack"], "Thrmnlra": ["Thrmnlra"], "uDead": ["uDead"],
              "VectorToss": ["VectorToss", "Animations"]}
 REFS = ["main"]      # every branch was merged on 16 Nov (owner: merge everything): all games are on main
-# still betas (the Library's Betas list) until the owner promotes them: they came from the
-# spark-roadtrip, vector-toss and deaddays branches
-BETAS = {"BlockCityHustle", "BounceRally", "CoastRoad", "CraterCrawler", "DeadDays", "DodgeTunnel",
-         "FareDash", "FuelLine", "GridSprint", "InterceptorRun", "LightTrailArena", "NeonDriftWastes",
-         "RampRider", "SquadBuggy", "TabletopRacers", "VectorToss", "WreckRing"}
+# still betas (the Library's Betas list) until the owner promotes them. 18 Nov 2026 the owner
+# approved the rest of the road trip games and Vector Toss (GAME_NOTES); these three keep open notes
+BETAS = {"DeadDays", "GridSprint", "InterceptorRun"}
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
 # it ships as the standalone edition (LIB_EDITOR main; the earlier one is tag edition/known-works)
 HOLD = {"Ig3dEditor"}
@@ -838,9 +838,35 @@ def status(m):
         print(f"  {label:<11} {m.win(p):<55} {n} files" if n else f"  {label:<11} {m.win(p):<55} (none)")
 
 
+def promote(m, keys):
+    """the owner approved these betas (a GAME_NOTES note): take them out of BETAS in this file,
+    rebuild catalog.tsv, mark their installed game.txt public, rebuild the manifests"""
+    global BETAS
+    src = open(__file__, encoding="utf-8").read()
+    line = re.search(r"^BETAS = \{.*?\}$", src, re.M | re.S)
+    left = sorted(BETAS - set(keys))
+    src = src[:line.start()] + "BETAS = {" + ", ".join('"%s"' % k for k in left) + "}" + src[line.end():]
+    open(__file__, "w", encoding="utf-8", newline="\n").write(src)
+    BETAS = set(left)
+    rows = build_catalog()
+    ids = {r["appid"] for r in rows if r["key"] in keys}
+    done = []
+    for folder in game_folders(m, library_list(m)):
+        p = os.path.join(folder, "game.txt")
+        txt = open(p, encoding="utf-8", newline="").read()
+        if re.search(r"^appid\t(\d+)", txt, re.M) and re.search(r"^appid\t(\d+)", txt, re.M).group(1) in ids:
+            new = re.sub(r"^branch\tbeta(\r?)$", r"branch\tpublic\1", txt, flags=re.M)
+            if new != txt:
+                open(p, "w", encoding="utf-8", newline="").write(new)
+                done.append(os.path.basename(folder))
+    w, _r = rebuild_manifests(m)
+    print(f"promoted {', '.join(sorted(keys))}; installed now public: {', '.join(done) or 'none'}; "
+          f"still beta: {', '.join(left) or 'none'}; {w} appmanifests")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "manifests", "catalog"])
+    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "manifests", "catalog", "promote"])
     ap.add_argument("--drive", default="/mnt/v")
     ap.add_argument("--user")
     ap.add_argument("--purge", action="store_true")
@@ -861,6 +887,10 @@ def main():
         status(m)
     elif a.cmd == "uninstall":
         uninstall(m, a.purge)
+    elif a.cmd == "promote":
+        if not a.games:
+            ap.error("promote needs --games KEY[,KEY]")
+        promote(m, a.games.split(","))
     elif a.cmd == "manifests":
         w, r = rebuild_manifests(m)
         print(f"wrote {w} appmanifests from game.txt, removed {r} that pointed at nothing")
