@@ -20,6 +20,8 @@ python3 -I escape_sim.py --only riley      # one persona
 python3 -I escape_sim.py --clean           # remove V:\_SimPCs
 python3 -I vibeinstall.py manifests        # rebuild every appmanifest from the game folders' game.txt
 python3 -I vibeinstall.py uninstall        # what a real uninstaller does: settings, saves and game folders holding your own files stay
+python3 -I vibeinstall.py comfygames       # Comfy Games on its own (Program Files (x86)\Comfy Games\LIB_COMFY\Player\ComfyGames.exe), then checks it
+python3 -I vibeinstall.py comfyverify      # only the check: files there, and Make a new one works for every genre
 ```
 
 Games are taken from the LIB_GAMES branches with `git archive` / `git show`, so the owner's
