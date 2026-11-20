@@ -164,11 +164,14 @@ COMMON_LIBS = [("LIB_BIT", "main", "livecode"), ("LIB_MAP", "main", "livecode"),
                ("LIB_MOCAP", "main", "library"), ("LIB_MOCAP", "main", "livecode"),
                ("LIB_GENERICA", "main", "sets"), ("LIB_MCP", "main", "assets")]
 DATA_DIRS = {"Antack": ["Antack"], "Thrmnlra": ["Thrmnlra"], "uDead": ["uDead"],
-             "VectorToss": ["VectorToss", "Animations"]}
+             "VectorToss": ["VectorToss", "Animations"], "PhotonBall": ["PhotonBall", "Animations"]}
 REFS = ["main"]      # every branch was merged on 16 Nov (owner: merge everything): all games are on main
 # still betas (the Library's Betas list) until the owner promotes them. 18 Nov 2026 the owner
 # approved the rest of the road trip games and Vector Toss (GAME_NOTES); these three keep open notes
-BETAS = {"DeadDays", "GridSprint", "InterceptorRun"}
+BETAS = {"DeadDays", "GridSprint", "InterceptorRun", "PhotonBall"}
+# betas that so far live only on their own LIB_GAMES branch (not on main): key -> branch.
+# PhotonBall: Vector Toss made dangerous (20 Nov 2026, branch photon-ball, waiting for the owner)
+BETA_BRANCHES = {"PhotonBall": "photon-ball"}
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
 # it ships as the standalone edition (LIB_EDITOR main; the earlier one is tag edition/known-works)
 HOLD = {"Ig3dEditor"}
@@ -225,6 +228,13 @@ def build_catalog():
             m = re.match(r".*/Vibecode3D_Play_(.+)\.livecodescript$", name)
             if m:
                 found.setdefault(m.group(1), []).append((ref, blob_id(ref, name)))
+    for key, ref in BETA_BRANCHES.items():
+        if key in found:
+            continue
+        try:
+            found[key] = [(ref, blob_id(ref, f"{REPO_PREFIX}Vibecode3D_Play_{key}.livecodescript"))]
+        except subprocess.CalledProcessError:
+            pass                       # the branch is gone (merged or deleted): nothing to list
     # titles that live in another repository (HOMES) are listed whether or not LIB_GAMES still has
     # a copy (16 Nov: once the old branches were merged, GeneticAnomaly and iGame3D XT vanished)
     for key in HOMES:

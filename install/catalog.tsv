@@ -31,6 +31,7 @@ appid	key	name	kind	branch	ref	betas	data
 1270	LongWorm	Long Worm	game	public	main		
 1280	MatrixLock	Matrix Lock	game	public	main		
 1290	NeonDriftWastes	Neon Drift Wastes	game	public	main		
+1540	PhotonBall	Photon Ball	game	beta	photon-ball	photon-ball	PhotonBall,Animations
 1300	ProbeVsCone	Probe Vs Cone	game	public	main		
 1310	PromptAndGlazeMaze	Prompt And Glaze Maze	game	public	main		
 1320	RampRider	Ramp Rider	game	public	main		
