@@ -14,6 +14,8 @@ way real people do and see what still works.
   python3 -I vibeinstall.py catalog                       (rebuild catalog.tsv from LIB_GAMES)
   python3 -I vibeinstall.py promote --games KEY[,KEY]     (the owner approved a beta: out of BETAS,
                                                            catalog, installed game.txt, manifests)
+  python3 -I vibeinstall.py comfygames [--drive /mnt/v]   (the Comfy Games app on its own, apart from
+                                                           the Library: LIB_COMFY/PLAN_STANDALONE.md)
 
 The public games come from LIB_GAMES branch install-findfile (the games' Game.FindFile, LAYOUT
 5.1) while it exists, else from main. Library paths on the exe's own drive are written relative
@@ -874,9 +876,113 @@ def promote(m, keys):
           f"still beta: {', '.join(left) or 'none'}; {w} appmanifests")
 
 
+
+# ---------------------------------------------------------------- Comfy Games (LIB_COMFY/Player)
+# Its own program and folder, never in the Library (owner, 18 Nov: Comfy games stay apart from the
+# hand-made ones). The folder keeps LIB_COMFY's shape, so the app, tools/make_game.py and Game.FindFile
+# find everything the way they do on the owner's PC:
+#   Program Files (x86)\Comfy Games\LIB_COMFY\Player\ComfyGames.exe   (+ Player\Engine\)
+#                                    LIB_COMFY\games, parts, ComfyUI-Vibecode3D, tools, workflows, genres.tsv
+#                                    LIB_GAMES\Vibecode3D_Games\  the two games the remix genres rewrite (+ their data)
+#                                    LIB_MOCAP\                    the clips Vector Toss's heroes move with
+COMFY_REPO = os.path.join(PROJECTS, "LIB_COMFY")
+COMFY_REF = os.environ.get("COMFY_REF", "comfy-games-app")
+COMFY_PRODUCT = "Comfy Games"
+COMFY_TRACKED = ["games", "parts", "ComfyUI-Vibecode3D", "workflows", "genres.tsv", "tools/make_game.py",
+                 "tools/kit_chains.py", "Player/README.md"]
+COMFY_EXE_DIR = os.path.join(COMFY_REPO, "Player", "build", "ComfyGames", "Windows x86-64")
+COMFY_REMIX = ["Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript",
+               "Vibecode3D_Games/Vibecode3D_Play_VectorToss.livecodescript",
+               "Vibecode3D_Games/VectorToss/banter.txt", "Vibecode3D_Games/Animations/VectorToss.anims.txt"]
+COMFY_MOCAP = ["livecode/anim_list.livecodescript"]
+
+
+def install_comfygames(m, say=print):
+    """Lay out Comfy Games on the drive: the program, the engine copy beside it, the shipped games
+    (the ones in git at COMFY_REF, never the owner's untracked builds), the kits for Make a new one."""
+    log = Log(m)
+    dest = os.path.join(m.program_files, COMFY_PRODUCT)
+    comfy = os.path.join(dest, "LIB_COMFY")
+    for path in COMFY_TRACKED:
+        data = git("archive", "--format=tar", COMFY_REF, path, binary=True, cwd=COMFY_REPO)
+        with tarfile.open(fileobj=io.BytesIO(data)) as t:
+            for mem in t.getmembers():
+                if mem.isfile() and "__pycache__" not in mem.name:
+                    out = os.path.join(comfy, mem.name)
+                    os.makedirs(os.path.dirname(out), exist_ok=True)
+                    with open(out, "wb") as f:
+                        f.write(t.extractfile(mem).read())
+                    log.made(out)
+    player = os.path.join(comfy, "Player")
+    if os.path.isdir(COMFY_EXE_DIR):
+        for root, _dirs, files in os.walk(COMFY_EXE_DIR):
+            for fn in files:
+                src = os.path.join(root, fn)
+                dst = os.path.join(player, os.path.relpath(src, COMFY_EXE_DIR))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                copy_unless_same(src, dst, say)
+                log.made(dst)
+    else:
+        say(f"  (no ComfyGames build in {COMFY_EXE_DIR}: build it in OXT-Beyond, LIB_COMFY/Player/README.md)")
+    install_engine_files(os.path.join(player, "Engine"), log, say)
+    lib_data = os.path.join(PROJECTS, "LIB_DATA", "livecode", "lib_data.livecodescript")
+    if os.path.isfile(lib_data):
+        shutil.copy2(lib_data, os.path.join(player, "Engine", "lib_data.livecodescript"))
+        log.made(os.path.join(player, "Engine", "lib_data.livecodescript"))
+    for rel in COMFY_REMIX:
+        out = os.path.join(dest, "LIB_GAMES", rel)
+        write(log, out, git("show", "main:" + rel), "")
+    anims = git("show", "main:Vibecode3D_Games/Animations/VectorToss.anims.txt")
+    clips = sorted({ln.split("\t")[1] for ln in anims.splitlines() if ln and not ln.startswith("#") and "\t" in ln})
+    mocap = os.path.join(PROJECTS, "LIB_MOCAP")
+    for rel in COMFY_MOCAP + [f"library/{c}/{c}_stick.txt" for c in clips]:
+        src = os.path.join(mocap, rel)
+        if os.path.isfile(src):
+            out = os.path.join(dest, "LIB_MOCAP", rel)
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            shutil.copy2(src, out)
+            log.made(out)
+        else:
+            say(f"  (LIB_MOCAP: no {rel}: Vector Toss remixes stand still)")
+    exe = os.path.join(player, "ComfyGames.exe")
+    shortcut(m, log, os.path.join(m.public_desktop, COMFY_PRODUCT + ".lnk"), exe)
+    shortcut(m, log, os.path.join(m.start_menu, COMFY_PRODUCT, COMFY_PRODUCT + ".lnk"), exe)
+    write(log, os.path.join(dest, "uninstall.log"), "\r\n".join(log.lines) + "\r\n", "")
+    games = len([f for f in os.listdir(os.path.join(comfy, "games")) if f.endswith(".livecodescript")])
+    say(f"installed {COMFY_PRODUCT} ({COMFY_REF}) into {m.win(dest)}: {games} games, {len(log.lines)} files logged")
+    return dest
+
+
+def verify_comfygames(m, say=print):
+    """What the app needs, checked on the installed copy: the program, the engine, the genres, and
+    Make a new one (tools/make_game.py run from the installed copy into a throwaway folder)."""
+    import tempfile
+    comfy = os.path.join(m.program_files, COMFY_PRODUCT, "LIB_COMFY")
+    bad = 0
+    for rel in ["Player/ComfyGames.exe", "Player/Engine/vibe_engine_xt3d.livecodescript",
+                "Player/Engine/game_player.livecodescript", "Player/Engine/lib_data.livecodescript", "genres.tsv",
+                "tools/make_game.py", "../LIB_GAMES/Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript"]:
+        ok = os.path.isfile(os.path.join(comfy, rel))
+        bad += not ok
+        say(("  ok    " if ok else "  MISS  ") + rel)
+    genres = [ln.split("\t")[0] for ln in open(os.path.join(comfy, "genres.tsv"), encoding="utf-8")
+              if ln.strip() and not ln.startswith("#")]
+    with tempfile.TemporaryDirectory() as tmp:
+        for g in genres:
+            r = subprocess.run([sys.executable, "-I", os.path.join(comfy, "tools", "make_game.py"), g, "--seed", "3",
+                                "--out", tmp], capture_output=True, text=True)
+            last = (r.stdout.strip().splitlines() or ["(nothing)"])[-1]
+            ok = last.startswith("OK ")
+            bad += not ok
+            say(("  ok    make " if ok else "  FAIL  make ") + g + ("" if ok else ": " + last + r.stderr[-300:]))
+    say(f"{COMFY_PRODUCT}: {'all there' if not bad else str(bad) + ' problems'}")
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "manifests", "catalog", "promote"])
+    ap.add_argument("cmd", choices=["install", "verify", "status", "uninstall", "manifests", "catalog", "promote",
+                                    "comfygames", "comfyverify"])
     ap.add_argument("--drive", default="/mnt/v")
     ap.add_argument("--user")
     ap.add_argument("--purge", action="store_true")
@@ -901,6 +1007,11 @@ def main():
         if not a.games:
             ap.error("promote needs --games KEY[,KEY]")
         promote(m, a.games.split(","))
+    elif a.cmd == "comfygames":
+        install_comfygames(m)
+        sys.exit(1 if verify_comfygames(m) else 0)
+    elif a.cmd == "comfyverify":
+        sys.exit(1 if verify_comfygames(m) else 0)
     elif a.cmd == "manifests":
         w, r = rebuild_manifests(m)
         print(f"wrote {w} appmanifests from game.txt, removed {r} that pointed at nothing")
