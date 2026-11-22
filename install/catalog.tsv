@@ -17,6 +17,7 @@ appid	key	name	kind	branch	ref	betas	data
 1130	demo	Demo	tool	public	main		
 1140	DodgeTunnel	Dodge Tunnel	game	public	main		
 1150	DotMaze	Dot Maze	game	public	main		
+1560	DotMazeLean	Dot Maze Lean	game	public	main		
 1160	Face	Face	tool	public	main		
 1170	FareDash	Fare Dash	game	public	main		
 1180	FloppyFlynn	Floppy Flynn	game	public	main		
