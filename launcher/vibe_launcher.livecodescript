@@ -180,6 +180,8 @@ function VL.Ordered pFilter
       if pFilter is "Games" and sGames[tId]["kind"] is not "game" then next repeat
       if pFilter is "Tools" and sGames[tId]["kind"] is not "tool" then next repeat
       if pFilter is "Betas" and sGames[tId]["branch"] is not "beta" then next repeat
+      -- a title marked "listed last" in its game.txt goes after the rest (p1-26: the old Dot Maze)
+      if sGames[tId]["listed"] is "last" then put "2" after tOut else put "1" after tOut
       put sGames[tId]["name"] & tab & tId & return after tOut
    end repeat
    delete last char of tOut
@@ -683,6 +685,10 @@ end VL.TestRoot
 function VL.Count
    return the number of lines of sOrder
 end VL.Count
+
+function VL.NameOf pId
+   return sGames[pId]["name"]
+end VL.NameOf
 
 function VL.Field pName
    return field pName of me
