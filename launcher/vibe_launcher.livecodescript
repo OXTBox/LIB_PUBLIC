@@ -337,11 +337,15 @@ command VL.BuildUI
 end VL.BuildUI
 
 command VL.Refresh
-   local tList, tId, tSel
+   local tList, tId, tSel, tN
    VL.Scan
    if sFilter is empty then put "All titles" into sFilter
+   -- p1-07 (23 Nov): a number left of each name, so a tester can say "game 21", not "Thrmnlra"
+   set the tabStops of field "Games" of me to 36
+   put 0 into tN
    repeat for each line tId in VL.Ordered(sFilter)
-      put sGames[tId]["name"] into tSel
+      add 1 to tN
+      put tN & tab & sGames[tId]["name"] into tSel
       if sGames[tId]["branch"] is "beta" then put "   (beta)" after tSel
       put tSel & return after tList
    end repeat
@@ -365,7 +369,7 @@ command VL.Select pLine
    if tId is empty then exit VL.Select
    put tId into sSel
    set the hilitedLine of field "Games" of me to pLine
-   put sGames[tId]["name"] into field "Title" of me
+   put pLine & "  " & sGames[tId]["name"] into field "Title" of me
    put VL.Info(tId) into tInfo
    if tInfo["about"] is not empty then put tInfo["about"] & return after tText
    if tInfo["keys"] is not empty then put "CONTROLS" & return & tInfo["keys"] & return after tText

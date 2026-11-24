@@ -6,7 +6,8 @@ Vibecode3D install on V:, made in OXT-Beyond. Draft 1, Opus, 15 Nov 2026.
 - `vibe_launcher.livecodescript` is the whole app: the stack script makes its window
   the first time it opens.
 - `Vibecode3D_Launcher.livecode` is the stack saved with that script, which is what gets built.
-- `build/Windows x86-64/Vibecode3D Library.exe` is the standalone. `install/vibeinstall.py`
+- `build/Vibecode3D Library/Vibecode3D Library.exe` is the standalone (64-bit only: Windows 32-bit off in the
+  standalone settings, so there is no `Windows x86-64` folder; owner, 23 Nov). `install/vibeinstall.py`
   copies it to `Program Files (x86)\Vibecode3D\` beside `Vibecode3D.exe`.
 
 ## What it does

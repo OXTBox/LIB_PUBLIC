@@ -334,7 +334,8 @@ ENGINE_FILES = [
     ("LIB_GAMES/tools/GameNotes.livecodescript", "GameNotes.livecodescript"),
 ]
 # the launcher standalone, saved by OXT-Beyond (LIB_PUBLIC/launcher/README.md)
-LAUNCHER_DIR = os.path.join(PROJECTS, "LIB_PUBLIC", "launcher", "build", "Vibecode3D Library", "Windows x86-64")
+# 64-bit only, so OXT-Beyond writes no "Windows x86-64" folder (owner, 23 Nov: 32-bit is never coming back)
+LAUNCHER_DIR = os.path.join(PROJECTS, "LIB_PUBLIC", "launcher", "build", "Vibecode3D Library")
 # the player logs to the owner's inbox; installed, it logs to the uErrorFile the launcher sets
 PLAYER_LOG_OLD = 'GL.Projects() & "/LIB_LLMIN/LIB_DEV/GAME_PLAYER_ERRORS.txt"'
 PLAYER_LOG_NEW = 'the uErrorFile of me'
@@ -459,6 +460,8 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
     if with_engine and os.path.isdir(LAUNCHER_DIR):        # the exe and its Externals, beside Vibecode3D.exe
         for root, _dirs, files in os.walk(LAUNCHER_DIR):
             for fn in files:
+                if fn.lower().endswith(".lnk"):
+                    continue                    # the owner's own shortcuts in the build folder
                 src = os.path.join(root, fn)
                 dst = os.path.join(m.install_dir, os.path.relpath(src, LAUNCHER_DIR))
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
