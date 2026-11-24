@@ -177,6 +177,8 @@ BETA_BRANCHES = {"PhotonBall": "photon-ball"}
 # held back from shipping (still in catalog.tsv, never installed). Ig3dEditor: owner, 16 Nov:
 # it ships as the standalone edition (LIB_EDITOR main; the earlier one is tag edition/known-works)
 HOLD = {"Ig3dEditor"}
+# listed after every other title in the Library (game.txt "listed last"): p1-26, 23 Nov
+LAST = {"DotMaze"}
 # titles whose home moved out of LIB_GAMES (owner, 16 Nov): key -> (repo, ref, folder of the script)
 HOMES = {"GeneticAnomaly": ("LIB_GAD", "main", "GeneticAnomaly/", []),
          "Ig3dEditor": ("LIB_EDITOR", "main", "iGame3D_XT/", ["Tools", "Data", "Help_2008"])}
@@ -190,7 +192,9 @@ def git(*args, cwd=GAMES_REPO, binary=False):
 
 
 def pretty(key):
-    special = {"uDead": "uDead", "Ig3dEditor": "iGame3D XT", "VectorPong3D": "Vector Pong 3D"}   # iGame3D XT: owner, 16 Nov
+    special = {"uDead": "uDead", "Ig3dEditor": "iGame3D XT", "VectorPong3D": "Vector Pong 3D",   # iGame3D XT: owner, 16 Nov
+               # p1-26 (23 Nov): the fast lean Dot Maze (30 fps) takes the name, the slow original moves to the end
+               "DotMazeLean": "Dot Maze", "DotMaze": "Dot Maze Original"}
     if key in special:
         return special[key]
     s = key.replace("_", " ")
@@ -504,7 +508,8 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
         # self-describing: a loose copy of this folder still says what it is
         write(log, os.path.join(folder, "game.txt"),
               f"appid\t{g['appid']}\nname\t{g['name']}\nkind\t{g['kind']}\nscript\t{script}\n"
-              f"data\t{g['data']}\nbranch\t{g['branch']}\nref\t{ref_from}\nengine\t{VERSION}\n")
+              f"data\t{g['data']}\nbranch\t{g['branch']}\nref\t{ref_from}\nengine\t{VERSION}\n"
+              + ("listed\tlast\n" if g["key"] in LAST else ""))
         write(log, os.path.join(folder, f"Play {g['name']}.cmd"), play_cmd(g["name"]), "")
         write(log, os.path.join(m.library, f"appmanifest_{g['appid']}.txt"),
               '"AppState"\n{\n' + kv({"appid": g["appid"], "name": g["name"], "installdir": g["name"],
