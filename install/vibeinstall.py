@@ -371,7 +371,7 @@ KIT = os.path.join(PROJECTS, "LIB_SFX", "kit")
 
 def install_audio_files(engine_dir, base, log, say=print):
     """engine_dir gets lib_audio, lib_sound_edit, lib_sfx, AUDIO.livecode and xtsfx/ (the extension);
-    base gets Sounds/<Category>/*.wav + kit.txt and Music/ (the engine finds them there, and AUDIO
+    base gets Sounds/<Category>/*.wav + KIT_RECIPE.txt (= LIB_SFX/kit/kit.txt) and Music/ (the engine finds them there, and AUDIO
     copies them once into the player's own Sounds folder)."""
     os.makedirs(engine_dir, exist_ok=True)
     for rel, name in AUDIO_TEXT + AUDIO_BIN:
@@ -410,7 +410,7 @@ def install_audio_files(engine_dir, base, log, say=print):
                 log.made(dst)
                 n += 1
     if os.path.isfile(os.path.join(KIT, "kit.txt")):
-        dst = os.path.join(base, "Sounds", "kit.txt")
+        dst = os.path.join(base, "Sounds", "KIT_RECIPE.txt")   # not kit.txt: Windows sees KIT.txt as the same file
         shutil.copy2(os.path.join(KIT, "kit.txt"), dst)
         log.made(dst)
     return n
@@ -960,7 +960,11 @@ COMFY_TRACKED = ["games", "parts", "ComfyUI-Vibecode3D", "workflows", "genres.ts
 COMFY_EXE_DIR = os.path.join(COMFY_REPO, "Player", "build", "ComfyGames", "Windows x86-64")
 COMFY_REMIX = ["Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript",
                "Vibecode3D_Games/Vibecode3D_Play_VectorToss.livecodescript",
-               "Vibecode3D_Games/VectorToss/banter.txt", "Vibecode3D_Games/Animations/VectorToss.anims.txt"]
+               "Vibecode3D_Games/VectorToss/banter.txt", "Vibecode3D_Games/Animations/VectorToss.anims.txt",
+               # Photon Ball (remix kit since 20 Nov): its script and hand-made walls
+               "Vibecode3D_Games/Vibecode3D_Play_PhotonBall.livecodescript",
+               "Vibecode3D_Games/PhotonBall/walls.cellmap", "Vibecode3D_Games/PhotonBall/banter.txt",
+               "Vibecode3D_Games/Animations/PhotonBall.anims.txt"]
 COMFY_MOCAP = ["livecode/anim_list.livecodescript"]
 
 
@@ -1000,7 +1004,8 @@ def install_comfygames(m, say=print):
     for rel in COMFY_REMIX:
         out = os.path.join(dest, "LIB_GAMES", rel)
         write(log, out, git("show", "main:" + rel), "")
-    anims = git("show", "main:Vibecode3D_Games/Animations/VectorToss.anims.txt")
+    anims = git("show", "main:Vibecode3D_Games/Animations/VectorToss.anims.txt") + "\n" + \
+        git("show", "main:Vibecode3D_Games/Animations/PhotonBall.anims.txt")
     clips = sorted({ln.split("\t")[1] for ln in anims.splitlines() if ln and not ln.startswith("#") and "\t" in ln})
     mocap = os.path.join(PROJECTS, "LIB_MOCAP")
     for rel in COMFY_MOCAP + [f"library/{c}/{c}_stick.txt" for c in clips]:
@@ -1031,7 +1036,7 @@ def verify_comfygames(m, say=print):
                 "Player/Engine/game_player.livecodescript", "Player/Engine/lib_data.livecodescript",
                 "Player/Engine/lib_audio.livecodescript", "Player/Engine/lib_sound_edit.livecodescript",
                 "Player/Engine/lib_sfx.livecodescript", "Player/Engine/xtsfx/module.lcm",
-                "Player/Sounds/Explode/Explode_42.wav", "Player/Sounds/kit.txt", "genres.tsv",
+                "Player/Sounds/Explode/Explode_42.wav", "Player/Sounds/KIT_RECIPE.txt", "genres.tsv",
                 "tools/make_game.py", "../LIB_GAMES/Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript"]:
         ok = os.path.isfile(os.path.join(comfy, rel))
         bad += not ok
