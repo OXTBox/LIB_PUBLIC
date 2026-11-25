@@ -958,6 +958,8 @@ COMFY_PRODUCT = "Comfy Games"
 COMFY_TRACKED = ["games", "parts", "ComfyUI-Vibecode3D", "workflows", "genres.tsv", "tools/make_game.py",
                  "tools/kit_chains.py", "Player/README.md"]
 COMFY_EXE_DIR = os.path.join(COMFY_REPO, "Player", "build", "ComfyGames", "Windows x86-64")
+if not os.path.isdir(COMFY_EXE_DIR):     # OXT-Beyond builds 64-bit only: no "Windows x86-64" folder (24 Nov)
+    COMFY_EXE_DIR = os.path.join(COMFY_REPO, "Player", "build", "ComfyGames")
 COMFY_REMIX = ["Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript",
                "Vibecode3D_Games/Vibecode3D_Play_VectorToss.livecodescript",
                "Vibecode3D_Games/VectorToss/banter.txt", "Vibecode3D_Games/Animations/VectorToss.anims.txt",
