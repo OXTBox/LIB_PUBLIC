@@ -253,6 +253,33 @@ function VL.EngineFile pFolder, pName
    return empty
 end VL.EngineFile
 
+-- the hidden AUDIO stack (LIB_AUDIO in Vibecode3D Common/Engine), as LIB_DEV's GL.Audio: the
+-- game's sounds fill one per tick and ... > Sounds... chooses them (and Edit... makes new ones).
+-- The kit in Vibecode3D Common/Sounds goes into the player's Sounds folder the first time.
+-- No lib_audio there (an older install): the engine's own sound kit, as before.
+command VL.Audio pFolder, pName, pFile
+   global bNoAudio
+   local tLib, tErr, tCommon
+   if bNoAudio is true then exit VL.Audio
+   put VL.EngineFile(pFolder, "lib_audio.livecodescript") into tLib
+   if tLib is empty then exit VL.Audio
+   set the itemDelimiter to "/"
+   put item 1 to -3 of tLib into tCommon
+   set the itemDelimiter to comma
+   try
+      if not ("lib_audio" is among the lines of the stacksInUse) then start using stack tLib
+      if not Audio.IsOpen() then
+         Audio.Open
+         Audio.Seed tCommon & "/Sounds", tCommon & "/Music"
+      end if
+      set the itemDelimiter to "/"
+      Audio.Refresh item 1 to -2 of pFile
+      set the itemDelimiter to comma
+      Audio.Select pName, pFile
+   catch tErr
+   end try
+end VL.Audio
+
 -------------------------------------------------------------------- the window
 
 command VL.BuildUI
@@ -586,6 +613,7 @@ function VL.Play pFolder, pQuitOnClose
    if tName begins with "Vibecode3D_Play_" then delete char 1 to 16 of tName
    set the itemDelimiter to "."
    put item 1 of tName into tName
+   VL.Audio pFolder, tName, tFile
    put "Play" && tName into tStack
    if there is a stack tStack then close stack tStack
    lock messages

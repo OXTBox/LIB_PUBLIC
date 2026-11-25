@@ -358,6 +358,64 @@ def install_engine_files(dest, log, say=print):
         log.made(dst)
 
 
+# AUDIO (LIB_AUDIO: the mixer, Sounds... window, sound editor), LIB_SFX (the editor's sound maker:
+# lib_sfx + the built xtsfx extension, Windows only) and the shared kit (LIB_SFX/kit: 42 sounds, 5 songs).
+AUDIO_TEXT = [("LIB_AUDIO/livecode/lib_audio.livecodescript", "lib_audio.livecodescript"),
+              ("LIB_AUDIO/livecode/lib_sound_edit.livecodescript", "lib_sound_edit.livecodescript"),
+              ("LIB_SFX/livecode/lib_sfx.livecodescript", "lib_sfx.livecodescript")]
+AUDIO_BIN = [("LIB_AUDIO/livecode/AUDIO.livecode", "AUDIO.livecode"),
+             ("LIB_SFX/c/RFXGEN_LICENSE.txt", "xtsfx/RFXGEN_LICENSE.txt")]
+XTSFX_EXT = os.environ.get("XTSFX_EXT", "/mnt/c/xtsfx/extension")   # made by LIB_SFX/build.bat
+KIT = os.path.join(PROJECTS, "LIB_SFX", "kit")
+
+
+def install_audio_files(engine_dir, base, log, say=print):
+    """engine_dir gets lib_audio, lib_sound_edit, lib_sfx, AUDIO.livecode and xtsfx/ (the extension);
+    base gets Sounds/<Category>/*.wav + kit.txt and Music/ (the engine finds them there, and AUDIO
+    copies them once into the player's own Sounds folder)."""
+    os.makedirs(engine_dir, exist_ok=True)
+    for rel, name in AUDIO_TEXT + AUDIO_BIN:
+        src = os.path.join(PROJECTS, rel)
+        if not os.path.isfile(src):
+            say(f"  (audio: no {rel})")
+            continue
+        dst = os.path.join(engine_dir, name)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        log.made(dst)
+    if os.path.isfile(os.path.join(XTSFX_EXT, "module.lcm")):
+        for root, _dirs, files in os.walk(XTSFX_EXT):
+            for fn in files:
+                rel = os.path.relpath(os.path.join(root, fn), XTSFX_EXT)
+                if not (fn.endswith((".lcm", ".lci", ".xml", ".dll"))):
+                    continue
+                dst = os.path.join(engine_dir, "xtsfx", rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                copy_unless_same(os.path.join(root, fn), dst, say)
+                log.made(dst)
+    else:
+        say(f"  (audio: no built xtsfx extension in {XTSFX_EXT}: the sound editor says so; run LIB_SFX/build.bat)")
+    n = 0
+    for sub in ("Sounds", "Music"):
+        src_dir = os.path.join(KIT, sub)
+        if not os.path.isdir(src_dir):
+            say(f"  (audio: no kit folder {src_dir})")
+            continue
+        for root, _dirs, files in os.walk(src_dir):
+            for fn in files:
+                src = os.path.join(root, fn)
+                dst = os.path.join(base, sub, os.path.relpath(src, src_dir))
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                copy_unless_same(src, dst, say)
+                log.made(dst)
+                n += 1
+    if os.path.isfile(os.path.join(KIT, "kit.txt")):
+        dst = os.path.join(base, "Sounds", "kit.txt")
+        shutil.copy2(os.path.join(KIT, "kit.txt"), dst)
+        log.made(dst)
+    return n
+
+
 def play_cmd(game_dir_name):
     """Play <Game>.cmd: start this game without the launcher. Robust on purpose: no ( ) blocks,
     since "Program Files (x86)" closes them (the naive version is tried in escape_sim)."""
@@ -457,6 +515,7 @@ def install(m, games=None, with_engine=True, quiet=False, include_held=False):
         say("  (Common: no iGame3D XT tools)")
     # the engine the launcher plays games with (LIB_PUBLIC/launcher): Vibecode3D Common\Engine
     install_engine_files(os.path.join(redist, "Engine"), log, say)
+    install_audio_files(os.path.join(redist, "Engine"), redist, log, say)
     if with_engine and os.path.isdir(LAUNCHER_DIR):        # the exe and its Externals, beside Vibecode3D.exe
         for root, _dirs, files in os.walk(LAUNCHER_DIR):
             for fn in files:
@@ -894,7 +953,7 @@ def promote(m, keys):
 #                                    LIB_GAMES\Vibecode3D_Games\  the two games the remix genres rewrite (+ their data)
 #                                    LIB_MOCAP\                    the clips Vector Toss's heroes move with
 COMFY_REPO = os.path.join(PROJECTS, "LIB_COMFY")
-COMFY_REF = os.environ.get("COMFY_REF", "comfy-games-app")
+COMFY_REF = os.environ.get("COMFY_REF", "main")   # comfy-games-app was merged 20 Nov
 COMFY_PRODUCT = "Comfy Games"
 COMFY_TRACKED = ["games", "parts", "ComfyUI-Vibecode3D", "workflows", "genres.tsv", "tools/make_game.py",
                  "tools/kit_chains.py", "Player/README.md"]
@@ -933,6 +992,7 @@ def install_comfygames(m, say=print):
     else:
         say(f"  (no ComfyGames build in {COMFY_EXE_DIR}: build it in OXT-Beyond, LIB_COMFY/Player/README.md)")
     install_engine_files(os.path.join(player, "Engine"), log, say)
+    install_audio_files(os.path.join(player, "Engine"), player, log, say)
     lib_data = os.path.join(PROJECTS, "LIB_DATA", "livecode", "lib_data.livecodescript")
     if os.path.isfile(lib_data):
         shutil.copy2(lib_data, os.path.join(player, "Engine", "lib_data.livecodescript"))
@@ -968,7 +1028,10 @@ def verify_comfygames(m, say=print):
     comfy = os.path.join(m.program_files, COMFY_PRODUCT, "LIB_COMFY")
     bad = 0
     for rel in ["Player/ComfyGames.exe", "Player/Engine/vibe_engine_xt3d.livecodescript",
-                "Player/Engine/game_player.livecodescript", "Player/Engine/lib_data.livecodescript", "genres.tsv",
+                "Player/Engine/game_player.livecodescript", "Player/Engine/lib_data.livecodescript",
+                "Player/Engine/lib_audio.livecodescript", "Player/Engine/lib_sound_edit.livecodescript",
+                "Player/Engine/lib_sfx.livecodescript", "Player/Engine/xtsfx/module.lcm",
+                "Player/Sounds/Explode/Explode_42.wav", "Player/Sounds/kit.txt", "genres.tsv",
                 "tools/make_game.py", "../LIB_GAMES/Vibecode3D_Games/Vibecode3D_Play_SquadBuggy.livecodescript"]:
         ok = os.path.isfile(os.path.join(comfy, rel))
         bad += not ok
